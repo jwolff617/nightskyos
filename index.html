@@ -1427,7 +1427,7 @@
       if (!inviteNodeId) { setInviteMsg({ type: 'error', text: 'Select a project to share.' }); return; }
       setInviting(true); setInviteMsg(null); setInviteLink(null);
       try {
-        const data = await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_label: inviteLabel.trim() || null });
+        const data = await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_email: inviteLabel.trim() || null });
         const token = data && data.token;
         if (token) {
           setInviteLink(`https://nightskyos.vercel.app?invite=${token}`);
