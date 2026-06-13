@@ -179,6 +179,9 @@
     .sent-invite { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
     .invite-status { font-size: 10px; padding: 2px 7px; border-radius: 3px; border: 1px solid currentColor; }
     .invite-status.pending { color: var(--accent); opacity: 0.7; }
+    .node-self-header { display: flex; align-items: flex-start; gap: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+    .node-self-name { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .node-self-content { font-size: 13px; opacity: 0.65; white-space: pre-wrap; }
     .invite-link-panel { background: var(--bg2); border: 1px solid var(--dot-green); border-radius: 8px; padding: 14px 16px; margin-top: 10px; }
     .invite-link-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 8px; }
     .invite-link-row { display: flex; gap: 8px; align-items: center; }
@@ -1045,6 +1048,13 @@
       if (!parentNode) return <div className="empty-hint">Navigate to a detail to see fragments.</div>;
       return (
         <div>
+          <div className="node-self-header">
+            <div style={{flex:1}}>
+              <div className="node-self-name">{parentNode.name}</div>
+              {parentNode.content && <div className="node-self-content">{parentNode.content}</div>}
+            </div>
+            <button className="hbtn" onClick={() => setEditModal(parentNode)}>✎ Edit</button>
+          </div>
           <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
             {area} · {relPath.join(' › ')}
             <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
@@ -1120,6 +1130,15 @@
         {deleteModal && <DeleteNodeConfirm node={deleteModal} onClose={() => setDeleteModal(null)} onDeleted={() => { setDeleteModal(null); onReload(area); }} />}
         {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
         {addModal && <AddNodeModal area={area} parentId={addParentId} level={addLevel} siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
+        {parentNode && (
+          <div className="node-self-header">
+            <div style={{flex:1}}>
+              <div className="node-self-name">{parentNode.name}</div>
+              {parentNode.content && <div className="node-self-content">{parentNode.content}</div>}
+            </div>
+            <button className="hbtn" onClick={() => setEditModal(parentNode)}>✎ Edit</button>
+          </div>
+        )}
         <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
           {heading}
           <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
@@ -1383,7 +1402,7 @@
   }
 
   // ── CollabsView ───────────────────────────────────────
-  function CollabsView({ userId, nodes, onReload }) {
+  function CollabsView({ userId, nodes, onReload, onNavigate }) {
     const [pending, setPending] = React.useState([]);
     const [sent, setSent] = React.useState([]);
     const [active, setActive] = React.useState([]);
@@ -1395,6 +1414,26 @@
     const [inviteLink, setInviteLink] = React.useState(null);
     const [copied, setCopied] = React.useState(false);
     const [responding, setResponding] = React.useState(null);
+
+    function findPathById(nodeList, targetId, acc = []) {
+      for (const node of nodeList) {
+        const p = [...acc, node.name];
+        if (node.id === targetId) return p;
+        if (node.children && node.children.length > 0) {
+          const found = findPathById(node.children, targetId, p);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function goToProject(invite) {
+      if (!onNavigate || !invite.node) return;
+      const area = invite.node.area || 'new_day';
+      const tree = buildTree(nodes[area] || []);
+      const segs = findPathById(tree, invite.node.id);
+      onNavigate(segs ? [area, ...segs] : [area]);
+    }
 
     function getProjectNodes(nodesArr, area) {
       const results = [];
@@ -1498,7 +1537,8 @@
                       {isOwner ? `shared with ${invite.invitee_email || 'teammate'}` : 'shared with you'}
                     </span>
                   </div>
-                  <span className="invite-status accepted" style={{color:'var(--dot-green)'}}>active</span>
+                  <button className="hbtn" style={{fontSize:11,padding:'4px 10px'}} onClick={() => goToProject(invite)}>→ Go to</button>
+                  <span className="invite-status accepted" style={{color:'var(--dot-green)',marginLeft:8}}>active</span>
                 </div>
               );
             })}
@@ -1584,14 +1624,24 @@
       setSelIdx(-1);
     }, [input, path, nodes]);
 
+    const AREAS = ['settings','new_day','context','journal','archive','collabs'];
     function pushHistory(cmd) { setHistory(prev => [cmd, ...prev.filter(h=>h!==cmd)].slice(0,10)); }
     function parseAndNavigate(raw) {
       const s = raw.trim(); if (!s) return;
       pushHistory(s); setHistoryIndex(-1);
-      if (s === '..') { onNavigate(path.slice(0,-1)); return; }
-      if (s === '...' || s === '/') { onNavigate([]); return; }
-      if (s.includes('.')) { onNavigate(s.split('.').filter(Boolean)); return; }
-      onNavigate([...path, s]);
+      if (s === '..' || s === 'back') { onNavigate(path.slice(0,-1)); return; }
+      if (s === '...' || s === '/' || s === 'home') { onNavigate([]); return; }
+      // Support › or . as path separators; convert display spaces back to underscores
+      let segs = null;
+      if (s.includes('›')) segs = s.split('›').map(x => x.trim().replace(/ /g,'_')).filter(Boolean);
+      else if (s.includes('.')) segs = s.split('.').map(x => x.trim().replace(/ /g,'_')).filter(Boolean);
+      if (segs) { onNavigate(segs); return; }
+      // Single segment — normalize spaces to underscores
+      const clean = s.replace(/ /g,'_');
+      // Absolute area name: always jump there from root
+      if (AREAS.includes(clean)) { onNavigate([clean]); return; }
+      // Relative: append to current path
+      onNavigate([...path, clean]);
     }
 
     function handleKeyDown(e) {
@@ -1772,7 +1822,7 @@
       );
       if (area === 'journal') return <JournalView journalEntries={journalEntries} userId={user.id} onReload={reloadJournal} />;
       if (area === 'archive') return <ArchiveView userId={user.id} onReload={reloadNodes} />;
-      if (area === 'collabs') return <CollabsView userId={user.id} nodes={nodes} onReload={reloadNodes} />;
+      if (area === 'collabs') return <CollabsView userId={user.id} nodes={nodes} onReload={reloadNodes} onNavigate={navigate} />;
       return <div className="empty-hint">Unknown area: {area}</div>;
     }
 
