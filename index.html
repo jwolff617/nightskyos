@@ -454,17 +454,25 @@
   ];
 
   // ── Seed ─────────────────────────────────────────────
-  async function seedLifeForUser(userId) {
-    for (const area of ['new_day', 'context']) {
-      const cat = await DB.createNode({ user_id: userId, parent_id: null, area, level: 'category', name: 'life', content: '', sort_order: 0 });
-      for (let ni = 0; ni < LIFE_SEED.length; ni++) {
-        const { note, details } = LIFE_SEED[ni];
-        const noteNode = await DB.createNode({ user_id: userId, parent_id: cat.id, area, level: 'note', name: note, content: '', sort_order: ni });
-        for (let di = 0; di < details.length; di++) {
-          await DB.createNode({ user_id: userId, parent_id: noteNode.id, area, level: 'detail', name: details[di], content: '', sort_order: di });
-        }
+  async function seedAreaLife(userId, area) {
+    const cat = await DB.createNode({ user_id: userId, parent_id: null, area, level: 'category', name: 'life', content: '', sort_order: 0 });
+    for (let ni = 0; ni < LIFE_SEED.length; ni++) {
+      const { note, details } = LIFE_SEED[ni];
+      const noteNode = await DB.createNode({ user_id: userId, parent_id: cat.id, area, level: 'note', name: note, content: '', sort_order: ni });
+      for (let di = 0; di < details.length; di++) {
+        await DB.createNode({ user_id: userId, parent_id: noteNode.id, area, level: 'detail', name: details[di], content: '', sort_order: di });
       }
     }
+  }
+
+  async function seedLifeForUser(userId) {
+    for (const area of ['new_day', 'context']) await seedAreaLife(userId, area);
+  }
+
+  async function reseedNewDayLife(userId) {
+    const existing = await DB.getNodes(userId, 'new_day');
+    if (buildTree(existing).some(c => c.name === 'life')) return;
+    await seedAreaLife(userId, 'new_day');
   }
 
   // ── Tree utils ───────────────────────────────────────
@@ -704,7 +712,7 @@
       <div className="header">
         <div className="header-logo" onClick={() => onNavigate([])}>Night_OS</div>
         <div className="breadcrumb">
-          <span className="breadcrumb-seg" onClick={() => onNavigate([])}>root</span>
+          <span className="breadcrumb-seg" onClick={() => onNavigate([])}>Home</span>
           {path.map((seg, i) => (
             <React.Fragment key={i}>
               <span className="breadcrumb-sep">›</span>
@@ -1479,7 +1487,7 @@
     const [historyIndex, setHistoryIndex] = React.useState(-1);
     const [selIdx, setSelIdx] = React.useState(-1);
     const inputRef = React.useRef(null);
-    const prompt = path.length > 0 ? path.map(p => p.replace('_',' ')).join(' › ') + ' › ' : 'root › ';
+    const prompt = path.length > 0 ? path.map(p => p.replace('_',' ')).join(' › ') + ' › ' : 'home › ';
 
     React.useEffect(() => {
       if (!input.trim()) { setSuggestions([]); return; }
@@ -1606,9 +1614,13 @@
         } else {
           try { await DB.upsertSettings(user.id, DEFAULT_SETTINGS); } catch(e) {}
         }
-        if (nd.length === 0 && ctx.length === 0) {
+        const ndHasLife = buildTree(nd).some(c => c.name === 'life');
+        const ctxHasLife = buildTree(ctx).some(c => c.name === 'life');
+        if (!ndHasLife || !ctxHasLife) {
           try {
-            await seedLifeForUser(user.id);
+            if (!ndHasLife && !ctxHasLife) await seedLifeForUser(user.id);
+            else if (!ndHasLife) await seedAreaLife(user.id, 'new_day');
+            else await seedAreaLife(user.id, 'context');
             const [ndNew, ctxNew] = await Promise.all([DB.getNodes(user.id,'new_day'), DB.getNodes(user.id,'context')]);
             setNodes(prev => ({ ...prev, new_day: ndNew, context: ctxNew }));
           } catch(e) { console.warn('Seed failed:', e); }
@@ -1638,6 +1650,7 @@
       async () => {
         const result = await runEODProcessing(user.id, settings.rules, nodesRef.current, journalRef.current);
         if (result && !result.skipped) {
+          try { await reseedNewDayLife(user.id); } catch(e) {}
           await Promise.all([reloadNodes('new_day'), reloadNodes('context'), reloadJournal()]);
           setEodBanner({ type: 'done', msg: `End of day complete: ${result.merged} merged, ${result.archived} archived.` });
         }
