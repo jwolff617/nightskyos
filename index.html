@@ -179,6 +179,15 @@
     .sent-invite { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
     .invite-status { font-size: 10px; padding: 2px 7px; border-radius: 3px; border: 1px solid currentColor; }
     .invite-status.pending { color: var(--accent); opacity: 0.7; }
+    .invite-link-panel { background: var(--bg2); border: 1px solid var(--dot-green); border-radius: 8px; padding: 14px 16px; margin-top: 10px; }
+    .invite-link-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 8px; }
+    .invite-link-row { display: flex; gap: 8px; align-items: center; }
+    .invite-link-hint { font-size: 11px; opacity: 0.45; margin-top: 6px; }
+    .invite-accept-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .invite-accept-box { background: var(--bg1); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px; max-width: 360px; width: 90%; }
+    .invite-accept-title { font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
+    .invite-accept-project { font-size: 18px; font-weight: 600; color: var(--accent); margin-bottom: 20px; }
+    .invite-accept-actions { display: flex; gap: 10px; }
     .invite-status.accepted { color: var(--dot-green); }
     .invite-status.declined { color: var(--dot-red); }
     .invite-form { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
@@ -407,6 +416,15 @@
       if (status === 'accepted') updates.invitee_id = userId;
       const { error } = await db.from('collab_invites').update(updates).eq('id', id);
       if (error) throw error;
+    },
+    async getInviteByToken(token) {
+      const { data, error } = await db.from('collab_invites')
+        .select('*, node:node_id(id, name, area)')
+        .eq('token', token)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (error) return null;
+      return data;
     },
   };
 
@@ -1361,10 +1379,12 @@
     const [pending, setPending] = React.useState([]);
     const [sent, setSent] = React.useState([]);
     const [loadingInvites, setLoadingInvites] = React.useState(true);
-    const [inviteEmail, setInviteEmail] = React.useState('');
+    const [inviteLabel, setInviteLabel] = React.useState('');
     const [inviteNodeId, setInviteNodeId] = React.useState('');
     const [inviting, setInviting] = React.useState(false);
     const [inviteMsg, setInviteMsg] = React.useState(null);
+    const [inviteLink, setInviteLink] = React.useState(null);
+    const [copied, setCopied] = React.useState(false);
     const [responding, setResponding] = React.useState(null);
 
     function getProjectNodes(nodesArr, area) {
@@ -1404,12 +1424,18 @@
 
     async function handleInvite(e) {
       e.preventDefault();
-      if (!inviteEmail.trim()) { setInviteMsg({ type: 'error', text: 'Email is required.' }); return; }
-      if (!inviteNodeId) { setInviteMsg({ type: 'error', text: 'Select a project node to share.' }); return; }
-      setInviting(true); setInviteMsg(null);
+      if (!inviteNodeId) { setInviteMsg({ type: 'error', text: 'Select a project to share.' }); return; }
+      setInviting(true); setInviteMsg(null); setInviteLink(null);
       try {
-        await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_email: inviteEmail.trim() });
-        setInviteMsg({ type: 'success', text: `Invite sent to ${inviteEmail.trim()}` });
+        const data = await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_label: inviteLabel.trim() || null });
+        const token = data && data.token;
+        if (token) {
+          setInviteLink(`https://nightskyos.vercel.app?invite=${token}`);
+          setInviteMsg(null);
+        } else {
+          setInviteMsg({ type: 'success', text: 'Invite created.' });
+        }
+        setInviteLabel(''); setInviteNodeId('');
         setInviteEmail('');
         loadInvites();
       } catch(ex) { setInviteMsg({ type: 'error', text: ex.message || 'Failed to send invite.' }); }
@@ -1457,8 +1483,8 @@
             <form onSubmit={handleInvite}>
               <div className="invite-form-row">
                 <div className="form-group">
-                  <label className="form-label">EMAIL</label>
-                  <input className="form-input" type="email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="teammate@example.com" />
+                  <label className="form-label">LABEL <span style={{opacity:0.4,fontWeight:400}}>(optional)</span></label>
+                  <input className="form-input" type="text" value={inviteLabel} onChange={e=>setInviteLabel(e.target.value)} placeholder="e.g. teammate name" />
                 </div>
                 <div className="form-group" style={{minWidth:140}}>
                   <label className="form-label">PROJECT NODE</label>
@@ -1472,6 +1498,17 @@
                 </button>
               </div>
               {inviteMsg && <div className={`form-msg ${inviteMsg.type}`} style={{marginTop:8}}>{inviteMsg.text}</div>}
+            {inviteLink && (
+              <div className="invite-link-panel" style={{marginTop:10}}>
+                <div className="invite-link-label">Share this link — no email sent</div>
+                <div className="invite-link-row">
+                  <input className="form-input" readOnly value={inviteLink} style={{flex:1,fontSize:11,fontFamily:'monospace'}} onFocus={e=>e.target.select()} />
+                  <button type="button" className="hbtn" style={{whiteSpace:'nowrap'}} onClick={()=>{ navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(()=>setCopied(false),2000); }}>{copied ? '✓ Copied' : 'Copy'}</button>
+                  <button type="button" className="hbtn" style={{opacity:0.5}} onClick={()=>setInviteLink(null)}>✕</button>
+                </div>
+                <div className="invite-link-hint">Send this link to your teammate. They'll accept when they open it.</div>
+              </div>
+            )}
             </form>
           </div>
         </div>
@@ -1574,6 +1611,8 @@
     const [dataLoading, setDataLoading] = React.useState(false);
     const [saveStatus, setSaveStatus] = React.useState('idle');
     const [eodBanner, setEodBanner] = React.useState(null);
+    const [inviteModal, setInviteModal] = React.useState(null);
+    const pendingInviteToken = React.useMemo(() => new URLSearchParams(window.location.search).get('invite'), []);
 
     const settingsDirtyRef = React.useRef(false);
     const saveTimerRef = React.useRef(null);
@@ -1582,6 +1621,23 @@
 
     React.useEffect(() => { nodesRef.current = nodes; }, [nodes]);
     React.useEffect(() => { journalRef.current = journalEntries; }, [journalEntries]);
+
+    // Invite token from URL — detect after login
+    React.useEffect(() => {
+      if (!user || !pendingInviteToken) return;
+      DB.getInviteByToken(pendingInviteToken).then(invite => {
+        if (invite && invite.owner_id !== user.id) setInviteModal(invite);
+        window.history.replaceState({}, '', window.location.pathname);
+      }).catch(() => {});
+    }, [user, pendingInviteToken]);
+
+    async function acceptInviteFromLink() {
+      if (!inviteModal || !user) return;
+      try {
+        await DB.respondCollabInvite(inviteModal.id, 'accepted', user.id);
+      } catch(e) { console.error(e); }
+      setInviteModal(null);
+    }
 
     // Theme
     React.useEffect(() => {
@@ -1706,6 +1762,19 @@
           </div>
         )}
         <CommandBar path={path} nodes={nodes} onNavigate={navigate} />
+        {inviteModal && (
+          <div className="invite-accept-overlay" onClick={e => e.target === e.currentTarget && setInviteModal(null)}>
+            <div className="invite-accept-box">
+              <div className="invite-accept-title">Project Invite</div>
+              <div className="invite-accept-project">{inviteModal.node?.name || 'Shared Project'}</div>
+              <div style={{fontSize:13,opacity:0.6,marginBottom:20}}>You've been invited to collaborate on this project.</div>
+              <div className="invite-accept-actions">
+                <button className="hbtn" style={{borderColor:'var(--dot-green)',color:'var(--dot-green)',padding:'8px 18px'}} onClick={acceptInviteFromLink}>Accept</button>
+                <button className="hbtn" style={{borderColor:'var(--dot-red)',color:'var(--dot-red)',padding:'8px 18px'}} onClick={() => { DB.respondCollabInvite(inviteModal.id,'declined',user.id).catch(()=>{}); setInviteModal(null); }}>Decline</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
