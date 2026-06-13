@@ -221,6 +221,11 @@
     .list-row.drag-over { border-left: 2px dashed var(--accent); opacity: 0.7; }
     .eod-top-n-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
     .eod-top-n-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 4px 8px; border-radius: 4px; width: 52px; text-align: center; }
+    .ctx-btn { background: none; border: 1px solid var(--dot-green); color: var(--dot-green); font-family: inherit; font-size: 10px; padding: 2px 5px; border-radius: 3px; cursor: pointer; opacity: 0.7; white-space: nowrap; }
+    .ctx-btn:hover { opacity: 1; background: var(--dot-green); color: var(--bg); }
+    .map-box.drop-valid { outline: 1px solid var(--dot-green); background: rgba(85,168,85,0.15); }
+    .map-box.drop-invalid { outline: 1px solid var(--dot-red); }
+    .map-drop-error { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); background: var(--dot-red); color: #fff; font-size: 12px; padding: 8px 16px; border-radius: 6px; z-index: 999; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -454,6 +459,10 @@
       if (error) return null;
       return data;
     },
+    async reparentNode(nodeId, newParentId, newArea, newSortOrder) {
+      const { error } = await db.from('nodes').update({ parent_id: newParentId || null, area: newArea, sort_order: newSortOrder || 0 }).eq('id', nodeId);
+      if (error) throw error;
+    },
     async swapSortOrders(id1, newOrder1, id2, newOrder2) {
       await Promise.all([
         db.from('nodes').update({ sort_order: newOrder1 }).eq('id', id1),
@@ -471,6 +480,10 @@
   };
 
   // ── Constants ────────────────────────────────────────
+  const SEED_GRAT = ["I am grateful for my health and the energy it gives me.","I appreciate the people who support and believe in me.","I am thankful for the opportunities in front of me.","I am grateful for the lessons hidden in my challenges.","I appreciate the beauty in small, everyday moments.","I am grateful for a safe place to rest and recharge.","I appreciate the curiosity that drives me to keep learning.","I am thankful for the friendships that make life richer.","I am grateful for my ability to adapt and grow.","I appreciate the quiet mornings that set my intentions.","I am thankful for the food that nourishes my body.","I am grateful for the laughter that lightens hard days.","I appreciate the mentors who share their wisdom freely.","I am grateful for the courage to try new things.","I appreciate access to knowledge and the ability to learn.","I am grateful for the creativity that lives inside me.","I appreciate every step forward, no matter how small.","I am thankful for the love I both give and receive.","I am grateful for the clarity that comes after reflection.","I appreciate the chance to begin again each morning.","I am grateful for the work that gives my days meaning.","I appreciate the moments of stillness in a busy world.","I am thankful for the strength I discover in difficulty.","I am grateful for the experiences that have shaped who I am.","I appreciate the kindness of strangers and friends alike.","I am grateful for music that moves and grounds me.","I appreciate nature's reminder that cycles are natural.","I am thankful for the goals that give me direction.","I am grateful for rest that restores my mind and body.","I appreciate that growth is always possible, at any stage."];
+  const SEED_QUOTES = [{t:"Imagination is more important than knowledge.",a:"Albert Einstein"},{t:"You can't use up creativity. The more you use, the more you have.",a:"Maya Angelou"},{t:"The only way to do great work is to love what you do.",a:"Steve Jobs"},{t:"In the middle of every difficulty lies opportunity.",a:"Albert Einstein"},{t:"The future belongs to those who believe in the beauty of their dreams.",a:"Eleanor Roosevelt"},{t:"It is not the mountain we conquer, but ourselves.",a:"Edmund Hillary"},{t:"The greatest glory in living lies not in never falling, but in rising.",a:"Nelson Mandela"},{t:"Education is the most powerful weapon to change the world.",a:"Nelson Mandela"},{t:"It always seems impossible until it's done.",a:"Nelson Mandela"},{t:"The secret of getting ahead is getting started.",a:"Mark Twain"},{t:"We are what we repeatedly do. Excellence is not an act but a habit.",a:"Aristotle"},{t:"Knowing yourself is the beginning of all wisdom.",a:"Aristotle"},{t:"The journey of a thousand miles begins with one step.",a:"Lao Tzu"},{t:"Simplicity is the ultimate sophistication.",a:"Leonardo da Vinci"},{t:"Be yourself; everyone else is already taken.",a:"Oscar Wilde"},{t:"Success is not final, failure is not fatal: it is the courage to continue that counts.",a:"Winston Churchill"},{t:"You miss 100% of the shots you don't take.",a:"Wayne Gretzky"},{t:"An investment in knowledge pays the best interest.",a:"Benjamin Franklin"},{t:"If you want to lift yourself up, lift up someone else.",a:"Booker T. Washington"},{t:"Happiness depends upon ourselves.",a:"Aristotle"}];
+  function dailyIndex(arr, salt) { const d = new Date(); const key = d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate() + (salt||0); return Math.abs(key) % arr.length; }
+
   const DEFAULT_SETTINGS = {
     theme: 'night',
     view_mode: 'panel',
@@ -530,12 +543,25 @@
 
   async function seedLifeForUser(userId) {
     for (const area of ['new_day', 'context']) await seedAreaLife(userId, area);
+    await reseedNewDayLife(userId); // seeds daily quote + gratitude (no-op if life already exists)
   }
 
   async function reseedNewDayLife(userId) {
     const existing = await DB.getNodes(userId, 'new_day');
     if (buildTree(existing).some(c => c.name === 'life')) return;
     await seedAreaLife(userId, 'new_day');
+    // Seed one daily quote and gratitude fragment
+    const fresh = await DB.getNodes(userId, 'new_day');
+    const tree = buildTree(fresh);
+    const todayNote = findNodeByPath(tree, ['life', 'today']);
+    if (todayNote) {
+      const quotesDetail = (todayNote.children || []).find(n => n.name === 'quotes');
+      const gratDetail = (todayNote.children || []).find(n => n.name === 'gratitudes');
+      const q = SEED_QUOTES[dailyIndex(SEED_QUOTES, 1)];
+      const g = SEED_GRAT[dailyIndex(SEED_GRAT, 2)];
+      if (quotesDetail) await DB.createNode({ user_id: userId, area: 'new_day', parent_id: quotesDetail.id, level: 'fragment', name: `"${q.t}" — ${q.a}`, content: '', sort_order: 0 });
+      if (gratDetail) await DB.createNode({ user_id: userId, area: 'new_day', parent_id: gratDetail.id, level: 'fragment', name: g, content: '', sort_order: 0 });
+    }
   }
 
   // ── Tree utils ───────────────────────────────────────
@@ -855,10 +881,40 @@
   }
 
   // ── Map Module ────────────────────────────────────────
-  function MapModule({ path, nodes, onNavigate }) {
-    // Always show the node tree — use the active area if in new_day/context, else default to new_day
+  // Level that a map box accepts as a dropped child
+  const LEVEL_ACCEPTS = { area: 'category', category: 'note', note: 'detail', detail: 'fragment' };
+
+  function MapModule({ path, nodes, onNavigate, onReparent }) {
     const mapArea = (path[0] === 'new_day' || path[0] === 'context') ? path[0] : 'new_day';
     const mapPath = path[0] === mapArea ? path : [mapArea];
+    const [dropError, setDropError] = React.useState(null);
+    const [dropOverKey, setDropOverKey] = React.useState(null);
+
+    function showError(msg) { setDropError(msg); setTimeout(() => setDropError(null), 2500); }
+
+    function getDropClass(key) {
+      if (dropOverKey !== key) return '';
+      const drag = window.__nightos_dragNode;
+      if (!drag) return '';
+      // Determine what level this target accepts
+      const targetBoxType = key === 'area' ? 'area' : key.split('__')[0]; // 'area' | 'category' | 'note' | 'detail'
+      const accepts = LEVEL_ACCEPTS[targetBoxType];
+      return accepts === drag.level ? ' drop-valid' : ' drop-invalid';
+    }
+
+    function handleMapDrop(e, targetType, targetNodeId, targetArea) {
+      e.preventDefault();
+      setDropOverKey(null);
+      const drag = window.__nightos_dragNode;
+      if (!drag) return;
+      const accepts = LEVEL_ACCEPTS[targetType];
+      if (accepts !== drag.level) {
+        showError(`Cannot drop a ${drag.level} here — this slot accepts ${accepts}s only.`);
+        return;
+      }
+      if (drag.id === targetNodeId) return;
+      onReparent(drag.id, targetNodeId || null, targetArea);
+    }
 
     const tree = buildTree(nodes[mapArea] || []);
     const levels = [tree];
@@ -871,9 +927,19 @@
     const rows = [];
     rows.push(
       <div key="areas" className="map-row">
-        {CONTENTS.map(c => (
-          <div key={c.key} className={`map-box${path[0]===c.key?' active':''}`} onClick={() => onNavigate([c.key])}>{c.label}</div>
-        ))}
+        {CONTENTS.map(c => {
+          const key = `area__${c.key}`;
+          return (
+            <div key={c.key}
+              className={`map-box${path[0]===c.key?' active':''}${getDropClass(key)}`}
+              onClick={() => onNavigate([c.key])}
+              onDragOver={e=>{e.preventDefault();setDropOverKey(key);}}
+              onDragLeave={()=>setDropOverKey(null)}
+              onDrop={e=>handleMapDrop(e,'area',null,c.key)}>
+              {c.label}
+            </div>
+          );
+        })}
       </div>
     );
     for (let lvl = 0; lvl < levels.length && lvl < 4; lvl++) {
@@ -881,16 +947,28 @@
       const activeName = mapPath[lvl + 1];
       rows.push(
         <div key={`lvl-${lvl}`} className="map-row">
-          {items.map(item => (
-            <div key={item.id} className={`map-box${activeName===item.name?' active':''}`}
-              onClick={() => onNavigate([mapArea, ...mapPath.slice(1, lvl + 1), item.name])}>
-              {item.name.slice(0, 4).toUpperCase()}
-            </div>
-          ))}
+          {items.map(item => {
+            const key = `${item.level}__${item.id}`;
+            return (
+              <div key={item.id}
+                className={`map-box${activeName===item.name?' active':''}${getDropClass(key)}`}
+                onClick={() => onNavigate([mapArea, ...mapPath.slice(1, lvl + 1), item.name])}
+                onDragOver={e=>{e.preventDefault();setDropOverKey(key);}}
+                onDragLeave={()=>setDropOverKey(null)}
+                onDrop={e=>handleMapDrop(e, item.level, item.id, mapArea)}>
+                {item.name.slice(0, 4).toUpperCase()}
+              </div>
+            );
+          })}
         </div>
       );
     }
-    return <div className="map-module">{rows}</div>;
+    return (
+      <div className="map-module">
+        {rows}
+        {dropError && <div className="map-drop-error">{dropError}</div>}
+      </div>
+    );
   }
 
   // ── AddNodeModal ──────────────────────────────────────
@@ -1152,7 +1230,12 @@
 
     function handleDragStart(e, node) {
       dragIdRef.current = node.id;
+      window.__nightos_dragNode = { id: node.id, level: node.level, area, name: node.name };
       e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragEnd() {
+      window.__nightos_dragNode = null;
     }
 
     function handleDrop(e, node) {
@@ -1165,6 +1248,34 @@
       DB.swapSortOrders(dragNode.id, node.sort_order, node.id, dragNode.sort_order)
         .then(() => onReload(area))
         .catch(e => console.error(e));
+    }
+
+    async function createContextPath(nodePath) {
+      // nodePath = relative path from category to target node e.g. ['life','health','exercise']
+      const ctxTree = buildTree((nodes.context || []));
+      let ctxParent = null;
+      let ctxParentId = null;
+      for (let i = 0; i < nodePath.length; i++) {
+        const seg = nodePath[i];
+        const lvl = LEVELS[i];
+        const children = ctxParent ? (ctxParent.children || []) : ctxTree;
+        const existing = children.find(n => n.name === seg);
+        if (existing) {
+          ctxParent = existing;
+          ctxParentId = existing.id;
+        } else {
+          if (children.length >= 10) return; // slot full — orange dot already warned user
+          try {
+            const { data, error } = await db.from('nodes')
+              .insert({ user_id: userId, area: 'context', parent_id: ctxParentId || null, level: lvl, name: seg, content: '', sort_order: children.length })
+              .select().single();
+            if (error || !data) return;
+            ctxParent = { ...data, children: [] };
+            ctxParentId = data.id;
+          } catch(e) { return; }
+        }
+      }
+      onReload('context');
     }
 
     function handleSwap(node) {
@@ -1240,16 +1351,20 @@
       const isFocused = focusedId === node.id;
       const isSwapPending = swapFirst?.id === node.id;
       const swapLabel = swapFirst ? (isSwapPending ? 'cancel swap' : 'swap with #' + (currentItems.findIndex(n=>n.id===swapFirst.id)+1)) : '⇄';
+      const nodePath = [...relPath, node.name];
+      const showCtxBtn = area === 'new_day' && dot !== 'green' && dot !== 'purple';
+      const dotTitle = dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD';
 
       if (viewMode === 'panel') {
         return (
           <div key={node.id} className={`panel-card${isSwapPending?' swap-pending':''}${isFocused?' focused':''}${dragOverId===node.id?' drag-over':''}`}
             onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
-            draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
+            draggable onDragStart={e=>handleDragStart(e,node)} onDragEnd={handleDragEnd} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
             <div className="card-top">
-              {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
+              {dot && <div className={`dot dot-${dot}`} title={dotTitle} />}
               <span className="card-name">{node.name}</span>
               <div className="card-actions">
+                {showCtxBtn && <button className="ctx-btn" onClick={e=>{e.stopPropagation();createContextPath(nodePath);}} title="Create matching path in context">→ ctx</button>}
                 <span className="rank-badge">#{rank}</span>
                 <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
                 <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down">↓</button>
@@ -1269,14 +1384,15 @@
         <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}${dragOverId===node.id?' drag-over':''}`}
           onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
           draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
-          {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
+          {dot && <div className={`dot dot-${dot}`} title={dotTitle} />}
           <span className="rank-badge">#{rank}</span>
           <span className="list-row-name">{node.name}</span>
           {node.content && <span className="list-row-content">{node.content}</span>}
           {node.level !== 'fragment' && <span className="list-row-sub">{childCount}/10</span>}
           <div className="list-row-actions">
+            {showCtxBtn && <button className="ctx-btn" onClick={e=>{e.stopPropagation();createContextPath(nodePath);}} title="Create matching path in context">→ ctx</button>}
             <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
-            <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down (Shift+↓)">↓</button>
+            <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down">↓</button>
             <button className={`swap-btn${isSwapPending?' pending':''}`}
               onClick={e=>{e.stopPropagation();handleSwap(node);}} title={swapFirst ? (isSwapPending ? 'Cancel' : 'Swap with selected') : 'Select for swap'}>⇄</button>
             <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
@@ -2066,6 +2182,17 @@
 
     function navigate(segs) { setPath(segs); }
 
+    async function handleReparent(nodeId, newParentId, newArea) {
+      try {
+        const allNodes = [...(nodesRef.current.new_day||[]), ...(nodesRef.current.context||[]), ...(nodesRef.current.collabs||[])];
+        const siblings = newParentId
+          ? allNodes.filter(n => n.parent_id === newParentId)
+          : (nodesRef.current[newArea]||[]).filter(n => !n.parent_id);
+        await DB.reparentNode(nodeId, newParentId, newArea, siblings.length);
+        await Promise.all([reloadNodes('new_day'), reloadNodes('context'), reloadNodes('collabs')]);
+      } catch(e) { console.error('Reparent failed:', e); }
+    }
+
     async function reloadNodes(area) {
       if (!user) return;
       try { const fresh = await DB.getNodes(user.id, area); setNodes(prev => ({ ...prev, [area]: fresh })); }
@@ -2114,7 +2241,7 @@
     return (
       <div className="app">
         <Header path={path} onNavigate={navigate} user={user} settings={settings} onSettingsChange={handleSettingsChange} />
-        <MapModule path={path} nodes={nodes} onNavigate={navigate} />
+        <MapModule path={path} nodes={nodes} onNavigate={navigate} onReparent={handleReparent} />
         <div className="main">{renderContent()}</div>
         {eodBanner && (
           <div className={`eod-banner ${eodBanner.type}`}>
