@@ -9,7 +9,7 @@
     :root {
       --bg: #0d0d14; --bg2: #12121e; --bg3: #1a1a2e;
       --text: #e8e4dc; --accent: #d4a853; --border: #2a2a3d;
-      --dot-red: #e05555; --dot-green: #55a855; --dot-purple: #9955cc;
+      --dot-red: #e05555; --dot-green: #55a855; --dot-purple: #9955cc; --dot-orange: #d4823a;
     }
     [data-theme="day"] {
       --bg: #faf9f7; --bg2: #f0ede8; --bg3: #e8e4de;
@@ -74,6 +74,7 @@
     .dot-red { background: var(--dot-red); }
     .dot-green { background: var(--dot-green); }
     .dot-green-new { background: radial-gradient(circle, var(--bg) 35%, var(--dot-green) 35%); border: 1px solid var(--dot-green); }
+    .dot-orange { background: var(--dot-orange); }
     .dot-purple { background: var(--dot-purple); }
 
     /* Icon buttons */
@@ -564,12 +565,15 @@
 
   function computeDot(node, pathFromCategory, contextTree) {
     if (pathFromCategory[1] === 'journal' || pathFromCategory[0] === 'journal') return 'purple';
-    // Exact path match → solid green: will merge INTO an existing context node
+    // Exact path match → solid green: merges INTO existing context node
     if (findNodeByPath(contextTree, pathFromCategory)) return 'green';
-    // Ancestor match (up to note level, depth 2) → hollow green: parent aligned, this node will be created/merged to parent
+    // Ancestor match (up to note level) → check if parent has a slot to create this node
     const maxAncestor = Math.min(pathFromCategory.length - 1, 2);
     for (let d = maxAncestor; d >= 1; d--) {
-      if (findNodeByPath(contextTree, pathFromCategory.slice(0, d))) return 'green-new';
+      const ancestor = findNodeByPath(contextTree, pathFromCategory.slice(0, d));
+      if (ancestor) {
+        return (ancestor.children || []).length >= 10 ? 'orange' : 'green-new';
+      }
     }
     return 'red';
   }
@@ -626,11 +630,10 @@
     }
 
     async function appendFragments(ndNode, ctxNode) {
-      // ctxNode = matching context node at same level as ndNode (or deepest ancestor fallback)
       if (!ctxNode) return;
       for (const child of (ndNode.children || [])) {
         if (child.level === 'fragment') {
-          // Fragments always merge into ctxNode (their logical parent in context)
+          // Append fragment content into ctxNode (the parent detail/note in context)
           if (child.content) {
             const siblings = (ctxNode.children || []).length;
             if (siblings < 10) {
@@ -641,9 +644,25 @@
             }
           }
         } else {
-          // Note or detail: recurse into matching context child, or fall back to ctxNode
-          const ctxChild = (ctxNode.children || []).find(c => c.name === child.name);
-          await appendFragments(child, ctxChild || ctxNode);
+          let ctxChild = (ctxNode.children || []).find(c => c.name === child.name);
+          if (!ctxChild) {
+            // Node doesn't exist in context — create it if a slot is available
+            const slots = (ctxNode.children || []).length;
+            if (slots < 10) {
+              try {
+                const { data, error } = await db.from('nodes')
+                  .insert({ user_id: userId, area: 'context', parent_id: ctxNode.id, level: child.level, name: child.name, content: child.content || '', sort_order: slots })
+                  .select().single();
+                if (!error && data) {
+                  ctxChild = { ...data, children: [] };
+                  if (!ctxNode.children) ctxNode.children = [];
+                  ctxNode.children.push(ctxChild);
+                }
+              } catch(e) {}
+            }
+            // If no slot available, skip this subtree (orange dot warned the user)
+          }
+          if (ctxChild) await appendFragments(child, ctxChild);
         }
       }
     }
@@ -1218,7 +1237,7 @@
             return (
               <div key={node.id} className="fragment-card" onClick={() => setEditModal(node)}>
                 <div className="fragment-card-header">
-                  {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
+                  {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
                   <span className="fragment-card-name">{node.name}</span>
                   <span className="rank-badge">#{idx + 1}</span>
                   <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
@@ -1251,7 +1270,7 @@
             onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
             draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
             <div className="card-top">
-              {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
+              {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
               <span className="card-name">{node.name}</span>
               <div className="card-actions">
                 <span className="rank-badge">#{rank}</span>
@@ -1273,7 +1292,7 @@
         <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}${dragOverId===node.id?' drag-over':''}`}
           onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
           draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
-          {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
+          {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'New panel — will be created in context at EOD':dot==='orange'?'Parent context node is full (10/10) — cannot create at EOD':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
           <span className="rank-badge">#{rank}</span>
           <span className="list-row-name">{node.name}</span>
           {node.content && <span className="list-row-content">{node.content}</span>}
