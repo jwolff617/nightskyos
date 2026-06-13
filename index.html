@@ -855,35 +855,39 @@
 
   // ── Map Module ────────────────────────────────────────
   function MapModule({ path, nodes, onNavigate }) {
+    // Always show the node tree — use the active area if in new_day/context, else default to new_day
+    const mapArea = (path[0] === 'new_day' || path[0] === 'context') ? path[0] : 'new_day';
+    const mapPath = path[0] === mapArea ? path : [mapArea];
+
+    const tree = buildTree(nodes[mapArea] || []);
+    const levels = [tree];
+    for (let i = 1; i < mapPath.length; i++) {
+      const node = findNodeByPath(tree, mapPath.slice(1, i + 1));
+      if (node && node.children.length > 0) levels.push(node.children);
+      else break;
+    }
+
     const rows = [];
     rows.push(
-      <div key="contents" className="map-row">
+      <div key="areas" className="map-row">
         {CONTENTS.map(c => (
           <div key={c.key} className={`map-box${path[0]===c.key?' active':''}`} onClick={() => onNavigate([c.key])}>{c.label}</div>
         ))}
       </div>
     );
-    if (path[0] === 'new_day' || path[0] === 'context') {
-      const area = path[0];
-      const tree = buildTree(nodes[area] || []);
-      const levels = [tree];
-      for (let i = 1; i < path.length; i++) {
-        const p = findNodeByPath(tree, path.slice(1, i+1));
-        if (p && p.children.length > 0) levels.push(p.children);
-        else break;
-      }
-      for (let lvl = 0; lvl < levels.length && lvl < 4; lvl++) {
-        const items = levels[lvl]; const activeName = path[lvl+1];
-        rows.push(
-          <div key={`lvl-${lvl}`} className="map-row">
-            {items.map(item => (
-              <div key={item.id} className={`map-box${activeName===item.name?' active':''}`} onClick={() => onNavigate([area, ...path.slice(1, lvl+1), item.name])}>
-                {item.name.slice(0,4).toUpperCase()}
-              </div>
-            ))}
-          </div>
-        );
-      }
+    for (let lvl = 0; lvl < levels.length && lvl < 4; lvl++) {
+      const items = levels[lvl];
+      const activeName = mapPath[lvl + 1];
+      rows.push(
+        <div key={`lvl-${lvl}`} className="map-row">
+          {items.map(item => (
+            <div key={item.id} className={`map-box${activeName===item.name?' active':''}`}
+              onClick={() => onNavigate([mapArea, ...mapPath.slice(1, lvl + 1), item.name])}>
+              {item.name.slice(0, 4).toUpperCase()}
+            </div>
+          ))}
+        </div>
+      );
     }
     return <div className="map-module">{rows}</div>;
   }
@@ -1957,6 +1961,7 @@
     }, [settings]);
 
     // Global Ctrl+Arrow map navigation — works everywhere in the app
+    // ↑ = go up a level  ↓ = into first child  ← = prev sibling  → = next sibling
     const pathRef = React.useRef(path);
     const nodesRef2 = React.useRef(nodes);
     React.useEffect(() => { pathRef.current = path; }, [path]);
@@ -1969,22 +1974,45 @@
         if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
         e.preventDefault();
         const p = pathRef.current;
-        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        const allNodes = nodesRef2.current;
+
+        if (e.key === 'ArrowUp') {
           navigate(p.slice(0, -1));
+
+        } else if (e.key === 'ArrowDown') {
+          if (p.length === 0) { navigate([CONTENTS[0].key]); return; }
+          const area = p[0];
+          if (!['new_day','context'].includes(area)) return;
+          const tree = buildTree(allNodes[area] || []);
+          const relPath = p.slice(1);
+          const cur = relPath.length === 0 ? { children: tree } : findNodeByPath(tree, relPath);
+          const children = (cur?.children || []).filter(c => c.level !== 'fragment');
+          if (children.length > 0) navigate([...p, children[0].name]);
+
         } else {
-          // Ctrl+Down/Right: navigate into focused node, or first child of current view
-          const focused = window.__nightos_focusedNode;
-          if (focused && focused.level !== 'fragment') {
+          // Left/Right: move between siblings (or between areas at top level)
+          const prev = e.key === 'ArrowLeft';
+          if (p.length === 0) return;
+
+          if (p.length === 1) {
+            // Sibling areas
+            const order = CONTENTS.map(c => c.key);
+            const idx = order.indexOf(p[0]);
+            if (idx === -1) return;
+            const next = order[idx + (prev ? -1 : 1)];
+            if (next) navigate([next]);
+          } else {
+            // Sibling nodes within the area
             const area = p[0];
-            const relPath = p.slice(1);
-            navigate([area, ...relPath, focused.name]);
-          } else if (p.length > 0) {
-            const area = p[0];
-            const areaNodes = nodesRef2.current[area] || [];
-            const tree = buildTree(areaNodes);
-            const relPath = p.slice(1);
-            const children = relPath.length === 0 ? tree : (findNodeByPath(tree, relPath)?.children || []);
-            if (children.length > 0 && children[0].level !== 'fragment') navigate([...p, children[0].name]);
+            const tree = buildTree(allNodes[area] || []);
+            const parentRelPath = p.slice(1, -1);
+            const currentName = p[p.length - 1];
+            const parent = parentRelPath.length === 0 ? { children: tree } : findNodeByPath(tree, parentRelPath);
+            const siblings = parent?.children || [];
+            const idx = siblings.findIndex(n => n.name === currentName);
+            if (idx === -1) return;
+            const next = siblings[idx + (prev ? -1 : 1)];
+            if (next) navigate([...p.slice(0, -1), next.name]);
           }
         }
       }
