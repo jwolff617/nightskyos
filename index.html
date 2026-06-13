@@ -620,19 +620,25 @@
     }
 
     async function appendFragments(ndNode, ctxNode) {
+      // ctxNode = matching context node at same level as ndNode (or deepest ancestor fallback)
       if (!ctxNode) return;
-      if (ndNode.level === 'fragment' && ndNode.content) {
-        const siblings = (ctxNode.children || []).length;
-        if (siblings < 10) {
-          try {
-            await DB.createNode({ user_id: userId, area: 'context', parent_id: ctxNode.id, level: 'fragment', name: ndNode.name, content: ndNode.content, sort_order: siblings });
-            merged++;
-          } catch(e) {}
-        }
-      }
       for (const child of (ndNode.children || [])) {
-        const ctxChild = (ctxNode.children || []).find(c => c.name === child.name);
-        await appendFragments(child, ctxChild);
+        if (child.level === 'fragment') {
+          // Fragments always merge into ctxNode (their logical parent in context)
+          if (child.content) {
+            const siblings = (ctxNode.children || []).length;
+            if (siblings < 10) {
+              try {
+                await DB.createNode({ user_id: userId, area: 'context', parent_id: ctxNode.id, level: 'fragment', name: child.name, content: child.content, sort_order: siblings });
+                merged++;
+              } catch(e) {}
+            }
+          }
+        } else {
+          // Note or detail: recurse into matching context child, or fall back to ctxNode
+          const ctxChild = (ctxNode.children || []).find(c => c.name === child.name);
+          await appendFragments(child, ctxChild || ctxNode);
+        }
       }
     }
 
