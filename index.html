@@ -417,6 +417,14 @@
       const { error } = await db.from('collab_invites').update(updates).eq('id', id);
       if (error) throw error;
     },
+    async getActiveCollabs(userId) {
+      const { data, error } = await db.from('collab_invites')
+        .select('*, node:node_id(id, name, area)')
+        .eq('status', 'accepted')
+        .or(`owner_id.eq.${userId},invitee_id.eq.${userId}`);
+      if (error) throw error;
+      return data || [];
+    },
     async getInviteByToken(token) {
       const { data, error } = await db.from('collab_invites')
         .select('*, node:node_id(id, name, area)')
@@ -1378,6 +1386,7 @@
   function CollabsView({ userId, nodes, onReload }) {
     const [pending, setPending] = React.useState([]);
     const [sent, setSent] = React.useState([]);
+    const [active, setActive] = React.useState([]);
     const [loadingInvites, setLoadingInvites] = React.useState(true);
     const [inviteLabel, setInviteLabel] = React.useState('');
     const [inviteNodeId, setInviteNodeId] = React.useState('');
@@ -1407,10 +1416,10 @@
 
     async function loadInvites() {
       try {
-        const [p, s] = await Promise.all([DB.getPendingInvites(), DB.getSentInvites(userId)]);
-        const myPending = p.filter(i => i.owner_id !== userId);
-        setPending(myPending);
-        setSent(s);
+        const [p, s, a] = await Promise.all([DB.getPendingInvites(), DB.getSentInvites(userId), DB.getActiveCollabs(userId)]);
+        setPending(p.filter(i => i.owner_id !== userId));
+        setSent(s.filter(i => i.status !== 'accepted'));
+        setActive(a);
       } catch(e) { console.warn('Collab load failed:', e); }
       setLoadingInvites(false);
     }
@@ -1436,7 +1445,6 @@
           setInviteMsg({ type: 'success', text: 'Invite created.' });
         }
         setInviteLabel(''); setInviteNodeId('');
-        setInviteEmail('');
         loadInvites();
       } catch(ex) { setInviteMsg({ type: 'error', text: ex.message || 'Failed to send invite.' }); }
       finally { setInviting(false); }
@@ -1474,6 +1482,26 @@
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {active.length > 0 && (
+          <div className="collab-section">
+            <div className="collab-section-title">Active Collaborations</div>
+            {active.map(invite => {
+              const isOwner = invite.owner_id === userId;
+              return (
+                <div key={invite.id} className="sent-invite" style={{borderLeft:'3px solid var(--dot-green)'}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontWeight:600}}>{invite.node?.name || 'Shared project'}</span>
+                    <span style={{opacity:0.45,fontSize:11,marginLeft:10}}>
+                      {isOwner ? `shared with ${invite.invitee_email || 'teammate'}` : 'shared with you'}
+                    </span>
+                  </div>
+                  <span className="invite-status accepted" style={{color:'var(--dot-green)'}}>active</span>
+                </div>
+              );
+            })}
           </div>
         )}
 
