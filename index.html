@@ -94,7 +94,10 @@
 
     /* Command bar */
     .command-bar { height: 44px; min-height: 44px; display: flex; align-items: center; background: var(--bg2); border-top: 1px solid var(--border); padding: 0 16px; position: relative; }
-    .cmd-prompt { font-size: 11px; opacity: 0.5; white-space: nowrap; margin-right: 6px; }
+    .cmd-prompt { font-size: 11px; opacity: 0.7; white-space: nowrap; margin-right: 6px; display: flex; align-items: center; gap: 2px; }
+    .cmd-prompt-seg { cursor: pointer; color: var(--accent); padding: 1px 3px; border-radius: 3px; }
+    .cmd-prompt-seg:hover { text-decoration: underline; text-underline-offset: 2px; opacity: 1; }
+    .cmd-prompt-sep { opacity: 0.4; padding: 0 1px; }
     .cmd-input { flex: 1; background: none; border: none; outline: none; font-family: inherit; font-size: 13px; color: var(--text); caret-color: var(--accent); }
     .cmd-suggestions { position: absolute; bottom: 44px; left: 0; right: 0; background: var(--bg3); border-top: 1px solid var(--border); max-height: 160px; overflow-y: auto; }
     .cmd-suggestion { padding: 6px 16px; font-size: 12px; cursor: pointer; opacity: 0.7; }
@@ -1608,7 +1611,7 @@
     const [historyIndex, setHistoryIndex] = React.useState(-1);
     const [selIdx, setSelIdx] = React.useState(-1);
     const inputRef = React.useRef(null);
-    const prompt = path.length > 0 ? path.map(p => p.replace('_',' ')).join(' › ') + ' › ' : 'home › ';
+    const promptSegs = path.length > 0 ? path : [];
 
     React.useEffect(() => {
       if (!input.trim()) { setSuggestions([]); return; }
@@ -1673,7 +1676,16 @@
             ))}
           </div>
         )}
-        <span className="cmd-prompt">{prompt}</span>
+        <span className="cmd-prompt">
+          <span className="cmd-prompt-seg" onClick={() => onNavigate([])}>home</span>
+          {promptSegs.map((seg, i) => (
+            <React.Fragment key={i}>
+              <span className="cmd-prompt-sep">›</span>
+              <span className="cmd-prompt-seg" onClick={() => onNavigate(promptSegs.slice(0, i+1))}>{seg.replace(/_/g,' ')}</span>
+            </React.Fragment>
+          ))}
+          <span className="cmd-prompt-sep">›</span>
+        </span>
         <input ref={inputRef} className="cmd-input" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="type to navigate..." autoComplete="off" spellCheck="false" />
       </div>
     );
