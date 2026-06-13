@@ -981,10 +981,19 @@
   }
 
   // ── WorkspaceView ─────────────────────────────────────
-  function WorkspaceView({ area, path, nodes, contextNodes, viewMode, onNavigate, onReload, userId }) {
+  function WorkspaceView({ area, path, nodes, contextNodes, viewMode, onNavigate, onReload, userId, onReseedLife }) {
     const [addModal, setAddModal] = React.useState(false);
     const [editModal, setEditModal] = React.useState(null);
     const [deleteModal, setDeleteModal] = React.useState(null);
+    const [seeding, setSeeding] = React.useState(false);
+    const [seedErr, setSeedErr] = React.useState('');
+
+    async function handleReseedLife() {
+      setSeeding(true); setSeedErr('');
+      try { await onReseedLife(area); }
+      catch(e) { setSeedErr(e.message || 'Restore failed.'); }
+      finally { setSeeding(false); }
+    }
 
     const relPath = path.slice(1);
     const areaNodes = nodes[area] || [];
@@ -1099,7 +1108,19 @@
           <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
           <button className="hbtn" style={{marginLeft:'auto'}} onClick={() => setAddModal(true)}>+ New {addLevel}</button>
         </div>
-        {currentItems.length === 0 && <div className="empty-hint">Empty. Add a {addLevel} to start.</div>}
+        {currentItems.length === 0 && (
+          <div style={{textAlign:'center',padding:'40px 0'}}>
+            <div className="empty-hint" style={{padding:0,marginBottom:16}}>Empty. Add a {addLevel} to start.</div>
+            {relPath.length === 0 && (
+              <div style={{marginTop:8}}>
+                <button className="hbtn" disabled={seeding} onClick={handleReseedLife} style={{fontSize:11}}>
+                  {seeding ? 'Restoring...' : '↺ Restore Life Structure'}
+                </button>
+                {seedErr && <div className="form-msg error" style={{marginTop:8,display:'inline-block',width:'auto'}}>{seedErr}</div>}
+              </div>
+            )}
+          </div>
+        )}
         {viewMode === 'panel'
           ? <div className="panel-grid">{currentItems.map(renderNode)}</div>
           : <div className="standard-list">{currentItems.map(renderNode)}</div>
@@ -1623,7 +1644,7 @@
             else await seedAreaLife(user.id, 'context');
             const [ndNew, ctxNew] = await Promise.all([DB.getNodes(user.id,'new_day'), DB.getNodes(user.id,'context')]);
             setNodes(prev => ({ ...prev, new_day: ndNew, context: ctxNew }));
-          } catch(e) { console.warn('Seed failed:', e); }
+          } catch(e) { console.error('Seed failed:', e); }
         }
         setDataLoading(false);
       });
@@ -1668,7 +1689,12 @@
       if (!area) return <RootView onNavigate={navigate} viewMode={settings.view_mode} nodes={nodes} />;
       if (area === 'settings') return <SettingsView settings={settings} onSettingsChange={handleSettingsChange} saveStatus={saveStatus} user={user} />;
       if (area === 'new_day' || area === 'context') return (
-        <WorkspaceView area={area} path={path} nodes={nodes} contextNodes={nodes.context} viewMode={settings.view_mode} onNavigate={navigate} onReload={reloadNodes} userId={user.id} />
+        <WorkspaceView area={area} path={path} nodes={nodes} contextNodes={nodes.context} viewMode={settings.view_mode} onNavigate={navigate} onReload={reloadNodes} userId={user.id}
+          onReseedLife={async (targetArea) => {
+            await seedAreaLife(user.id, targetArea);
+            await reloadNodes(targetArea);
+          }}
+        />
       );
       if (area === 'journal') return <JournalView journalEntries={journalEntries} userId={user.id} onReload={reloadJournal} />;
       if (area === 'archive') return <ArchiveView userId={user.id} onReload={reloadNodes} />;
