@@ -159,8 +159,6 @@
     .fragment-card:hover { border-color: var(--accent); background: var(--bg3); }
     .fragment-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .fragment-card-name { font-size: 12px; font-weight: 600; flex: 1; }
-    .fragment-card-content { font-size: 12px; opacity: 0.7; white-space: pre-wrap; line-height: 1.6; }
-    .fragment-empty { font-size: 11px; opacity: 0.35; font-style: italic; }
 
     /* EOD Banner */
     .eod-banner { position: fixed; bottom: 44px; left: 0; right: 0; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 200; font-size: 12px; border-top: 2px solid var(--accent); background: var(--bg2); }
@@ -833,12 +831,6 @@
               <label className="form-label">NAME</label>
               <input className="form-input" value={name} onChange={e=>setName(e.target.value)} autoFocus placeholder={`${levelLabel(level)} name`} />
             </div>
-            {level === 'fragment' && (
-              <div className="form-group">
-                <label className="form-label">CONTENT</label>
-                <textarea className="form-input" rows={4} value={content} onChange={e=>setContent(e.target.value)} placeholder="Fragment content..." style={{resize:'vertical'}} />
-              </div>
-            )}
             {err && <div className="form-msg error">{err}</div>}
             <div style={{display:'flex',gap:8,marginTop:16}}>
               <button className="form-btn" type="submit" disabled={busy} style={{flex:1}}>{busy?'Saving...':'Create'}</button>
@@ -875,7 +867,7 @@
               <label className="form-label">NAME</label>
               <input className="form-input" value={name} onChange={e=>setName(e.target.value)} autoFocus />
             </div>
-            {(node.level === 'fragment' || node.level === 'detail') && (
+            {node.level === 'detail' && (
               <div className="form-group">
                 <label className="form-label">CONTENT</label>
                 <textarea className="form-input" rows={5} value={content} onChange={e=>setContent(e.target.value)} style={{resize:'vertical'}} placeholder="Content..." />
@@ -1064,10 +1056,6 @@
                   <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
                   <button className="icon-btn danger" onClick={e => { e.stopPropagation(); setDeleteModal(node); }} title="Delete">✕</button>
                 </div>
-                {node.content
-                  ? <div className="fragment-card-content">{node.content}</div>
-                  : <div className="fragment-empty">no content — click to add</div>
-                }
               </div>
             );
           })}
