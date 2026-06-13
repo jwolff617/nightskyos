@@ -1175,38 +1175,10 @@
       }
     }
 
-    // Keyboard shortcuts — Shift+Arrow: reorder rank; Ctrl+Arrow: navigate level
+    // Expose focused node for App-level Ctrl+Arrow navigation
     React.useEffect(() => {
-      async function handleKeyDown(e) {
-        if (addModal || editModal || deleteModal) return;
-        if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) return;
-
-        // Ctrl+Arrow: navigate up a level or into focused node
-        if (e.ctrlKey || e.metaKey) {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            onNavigate(path.slice(0, -1));
-          } else if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && focusedId) {
-            e.preventDefault();
-            const node = currentItemsRef.current.find(n => n.id === focusedId);
-            if (node && node.level !== 'fragment') {
-              onNavigate([area, ...relPath, node.name]);
-            }
-          }
-          return;
-        }
-
-        // Shift+Arrow: reorder focused node rank
-        if (e.shiftKey && focusedId) {
-          e.preventDefault();
-          const dir = (e.key === 'ArrowUp' || e.key === 'ArrowLeft') ? 'up' : 'down';
-          const node = currentItemsRef.current.find(n => n.id === focusedId);
-          if (node) await moveNode(node, dir);
-        }
-      }
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [focusedId, addModal, editModal, deleteModal, path, area, relPath]);
+      if (focusedId) window.__nightos_focusedNode = currentItemsRef.current.find(n => n.id === focusedId) || null;
+    }, [focusedId]);
 
     function getDotClass(node) {
       if (area !== 'new_day') return null;
@@ -1274,8 +1246,8 @@
               <span className="card-name">{node.name}</span>
               <div className="card-actions">
                 <span className="rank-badge">#{rank}</span>
-                <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Shift+↑ / Shift+← to move up">↑</button>
-                <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Shift+↓ / Shift+→ to move down">↓</button>
+                <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
+                <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down">↓</button>
                 <button className={`swap-btn${isSwapPending?' pending':swapFirst?' pending':''}`}
                   onClick={e=>{e.stopPropagation();handleSwap(node);}} title={swapFirst ? (isSwapPending ? 'Click to cancel' : 'Click to swap positions') : 'Select for position swap'}>⇄</button>
                 <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
@@ -1298,7 +1270,7 @@
           {node.content && <span className="list-row-content">{node.content}</span>}
           {node.level !== 'fragment' && <span className="list-row-sub">{childCount}/10</span>}
           <div className="list-row-actions">
-            <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up (Shift+↑)">↑</button>
+            <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
             <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down (Shift+↓)">↓</button>
             <button className={`swap-btn${isSwapPending?' pending':''}`}
               onClick={e=>{e.stopPropagation();handleSwap(node);}} title={swapFirst ? (isSwapPending ? 'Cancel' : 'Swap with selected') : 'Select for swap'}>⇄</button>
@@ -1983,6 +1955,42 @@
         } catch(e) { setSaveStatus('idle'); }
       }, 700);
     }, [settings]);
+
+    // Global Ctrl+Arrow map navigation — works everywhere in the app
+    const pathRef = React.useRef(path);
+    const nodesRef2 = React.useRef(nodes);
+    React.useEffect(() => { pathRef.current = path; }, [path]);
+    React.useEffect(() => { nodesRef2.current = nodes; }, [nodes]);
+
+    React.useEffect(() => {
+      function handleKeyDown(e) {
+        if (!e.ctrlKey && !e.metaKey) return;
+        if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) return;
+        if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+        e.preventDefault();
+        const p = pathRef.current;
+        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+          navigate(p.slice(0, -1));
+        } else {
+          // Ctrl+Down/Right: navigate into focused node, or first child of current view
+          const focused = window.__nightos_focusedNode;
+          if (focused && focused.level !== 'fragment') {
+            const area = p[0];
+            const relPath = p.slice(1);
+            navigate([area, ...relPath, focused.name]);
+          } else if (p.length > 0) {
+            const area = p[0];
+            const areaNodes = nodesRef2.current[area] || [];
+            const tree = buildTree(areaNodes);
+            const relPath = p.slice(1);
+            const children = relPath.length === 0 ? tree : (findNodeByPath(tree, relPath)?.children || []);
+            if (children.length > 0 && children[0].level !== 'fragment') navigate([...p, children[0].name]);
+          }
+        }
+      }
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     function handleSettingsChange(newSettings) {
       settingsDirtyRef.current = true;
