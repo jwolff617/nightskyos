@@ -555,12 +555,33 @@
     const ctxTree = buildTree(nodes.context || []);
     let merged = 0, archived = 0;
 
-    async function archiveTree(node, path) {
-      try {
-        await DB.addArchiveRow({ user_id: userId, original_path: `new_day.${path.join('.')}`, level: node.level, parent_name: path.length > 1 ? path[path.length-2] : 'new_day', content: node.content || '' });
-        archived++;
-      } catch(e) {}
-      for (const child of (node.children || [])) await archiveTree(child, [...path, child.name]);
+    // Seed node detection — name + position in the life hierarchy
+    const SEED_NOTE_NAMES = new Set(LIFE_SEED.map(s => s.note));
+    const SEED_DETAIL_MAP = {};
+    LIFE_SEED.forEach(s => { if (s.details.length) SEED_DETAIL_MAP[s.note] = new Set(s.details); });
+
+    function isSeedNode(nodeName, parentName) {
+      if (nodeName === 'life') return true;
+      if (parentName === 'life' && SEED_NOTE_NAMES.has(nodeName)) return true;
+      if (SEED_DETAIL_MAP[parentName] && SEED_DETAIL_MAP[parentName].has(nodeName)) return true;
+      return false;
+    }
+
+    function subtreeHasContent(node) {
+      if (node.content && node.content.trim()) return true;
+      return (node.children || []).some(subtreeHasContent);
+    }
+
+    async function archiveTree(node, path, parentName = '') {
+      const seed = isSeedNode(node.name, parentName);
+      const skip = seed && !subtreeHasContent(node);
+      if (!skip) {
+        try {
+          await DB.addArchiveRow({ user_id: userId, original_path: `new_day.${path.join('.')}`, level: node.level, parent_name: path.length > 1 ? path[path.length - 2] : 'new_day', content: node.content || '' });
+          archived++;
+        } catch(e) {}
+      }
+      for (const child of (node.children || [])) await archiveTree(child, [...path, child.name], node.name);
     }
 
     async function appendFragments(ndNode, ctxNode) {
@@ -587,10 +608,10 @@
         if (dot === 'green' && rules.auto_append_matched) {
           const ctxCat = ctxTree.find(c => c.name === cat.name);
           await appendFragments(cat, ctxCat);
-          await archiveTree(cat, [cat.name]);
+          await archiveTree(cat, [cat.name], '');
           try { await DB.deleteNode(cat.id); } catch(e) {}
         } else if (dot === 'red' && rules.auto_archive_unmatched) {
-          await archiveTree(cat, [cat.name]);
+          await archiveTree(cat, [cat.name], '');
           try { await DB.deleteNode(cat.id); } catch(e) {}
         }
       }
