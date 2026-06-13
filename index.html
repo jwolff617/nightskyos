@@ -559,7 +559,13 @@
 
   function computeDot(node, pathFromCategory, contextTree) {
     if (pathFromCategory[1] === 'journal' || pathFromCategory[0] === 'journal') return 'purple';
-    return findNodeByPath(contextTree, pathFromCategory) ? 'green' : 'red';
+    // Check alignment at note level (depth 2) max — details/fragments inherit from ancestor match.
+    // A node is green if its path OR any ancestor path up to depth 2 exists in context.
+    const checkDepth = Math.min(pathFromCategory.length, 2);
+    for (let d = checkDepth; d >= 1; d--) {
+      if (findNodeByPath(contextTree, pathFromCategory.slice(0, d))) return 'green';
+    }
+    return 'red';
   }
 
   function SlotBar({ filled, total = 10 }) {
