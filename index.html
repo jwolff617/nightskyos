@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Night_OS</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0d14; --bg2: #12121e; --bg3: #1a1a2e;
+      --text: #e8e4dc; --accent: #d4a853; --border: #2a2a3d;
+      --dot-red: #e05555; --dot-green: #55a855; --dot-purple: #9955cc;
+    }
+    [data-theme="day"] {
+      --bg: #faf9f7; --bg2: #f0ede8; --bg3: #e8e4de;
+      --text: #1a1a1a; --accent: #b8862e; --border: #d4cfc8;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: 'JetBrains Mono', monospace; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
+    .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* Header */
+    .header { height: 48px; min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg2); border-bottom: 1px solid var(--border); gap: 12px; }
+    .header-logo { font-size: 14px; font-weight: 700; color: var(--accent); cursor: pointer; white-space: nowrap; letter-spacing: 0.5px; }
+    .header-logo:hover { opacity: 0.8; }
+    .breadcrumb { flex: 1; display: flex; align-items: center; gap: 4px; overflow: hidden; font-size: 11px; color: var(--text); opacity: 0.6; }
+    .breadcrumb-seg { cursor: pointer; padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
+    .breadcrumb-seg:hover { background: var(--bg3); opacity: 1; }
+    .breadcrumb-sep { opacity: 0.4; }
+    .header-right { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .header-email { font-size: 11px; opacity: 0.5; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .hbtn { background: none; border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer; line-height: 1; }
+    .hbtn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Map Module */
+    .map-module { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; flex-direction: column; gap: 6px; }
+    .map-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .map-box { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: var(--bg3); color: var(--text); opacity: 0.7; transition: all 0.15s; min-width: 48px; text-align: center; }
+    .map-box:hover { opacity: 1; border-color: var(--accent); }
+    .map-box.active { border-color: var(--accent); color: var(--accent); opacity: 1; background: var(--bg); }
+
+    /* Main */
+    .main { flex: 1; overflow-y: auto; padding: 16px; }
+    .main::-webkit-scrollbar { width: 6px; }
+    .main::-webkit-scrollbar-track { background: var(--bg); }
+    .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* Panel grid */
+    .panel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .panel-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; min-height: 100px; }
+    .panel-card:hover { border-color: var(--accent); background: var(--bg3); }
+    .panel-card.new-stub { border-style: dashed; opacity: 0.4; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .panel-card.new-stub:hover { opacity: 0.7; }
+    .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .card-name { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-sub { font-size: 10px; opacity: 0.5; margin-bottom: 10px; }
+    .card-content-preview { font-size: 10px; opacity: 0.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 8px; }
+    .card-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 4px; }
+    .panel-card:hover .card-actions { display: flex; }
+
+    /* Standard list */
+    .standard-list { display: flex; flex-direction: column; gap: 4px; }
+    .list-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 4px; cursor: pointer; transition: border-color 0.15s; }
+    .list-row:hover { border-left-color: var(--accent); border-color: var(--accent); }
+    .list-row-name { flex: 1; font-size: 13px; font-weight: 500; }
+    .list-row-sub { font-size: 11px; opacity: 0.45; }
+    .list-row-content { font-size: 11px; opacity: 0.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+    .list-row-actions { display: none; gap: 4px; }
+    .list-row:hover .list-row-actions { display: flex; }
+
+    /* Color dots */
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-red { background: var(--dot-red); }
+    .dot-green { background: var(--dot-green); }
+    .dot-purple { background: var(--dot-purple); }
+
+    /* Icon buttons */
+    .icon-btn { background: none; border: 1px solid transparent; color: var(--text); font-size: 11px; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-family: inherit; line-height: 1; opacity: 0.6; }
+    .icon-btn:hover { border-color: var(--border); opacity: 1; }
+    .icon-btn.danger:hover { border-color: var(--dot-red); color: var(--dot-red); opacity: 1; }
+
+    /* Slot bar */
+    .slot-bar { display: flex; gap: 2px; align-items: center; }
+    .slot-pip { width: 8px; height: 3px; border-radius: 2px; background: var(--border); }
+    .slot-pip.filled { background: var(--accent); }
+
+    /* Section */
+    .section-heading { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; opacity: 0.5; margin-bottom: 12px; }
+    .section-count { font-size: 11px; opacity: 0.4; margin-bottom: 16px; }
+    .empty-hint { opacity: 0.3; font-size: 12px; text-align: center; padding: 40px 0; }
+    .placeholder-box { background: var(--bg2); border: 1px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; opacity: 0.45; font-size: 12px; }
+    .loading { opacity: 0.4; font-size: 12px; padding: 24px 0; text-align: center; }
+
+    /* Command bar */
+    .command-bar { height: 44px; min-height: 44px; display: flex; align-items: center; background: var(--bg2); border-top: 1px solid var(--border); padding: 0 16px; position: relative; }
+    .cmd-prompt { font-size: 11px; opacity: 0.5; white-space: nowrap; margin-right: 6px; }
+    .cmd-input { flex: 1; background: none; border: none; outline: none; font-family: inherit; font-size: 13px; color: var(--text); caret-color: var(--accent); }
+    .cmd-suggestions { position: absolute; bottom: 44px; left: 0; right: 0; background: var(--bg3); border-top: 1px solid var(--border); max-height: 160px; overflow-y: auto; }
+    .cmd-suggestion { padding: 6px 16px; font-size: 12px; cursor: pointer; opacity: 0.7; }
+    .cmd-suggestion:hover, .cmd-suggestion.selected { background: var(--bg2); opacity: 1; color: var(--accent); }
+
+    /* Auth / form */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; width: 360px; padding: 28px; }
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 20px; letter-spacing: 0.5px; }
+    .modal-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+    .modal-tab { flex: 1; padding: 6px; background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: inherit; font-size: 11px; cursor: pointer; opacity: 0.6; }
+    .modal-tab.active { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 10px; opacity: 0.5; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
+    .form-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-family: inherit; font-size: 13px; color: var(--text); outline: none; }
+    .form-input:focus { border-color: var(--accent); }
+    .form-btn { width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: 4px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--bg); cursor: pointer; margin-top: 6px; }
+    .form-btn:hover { opacity: 0.85; }
+    .form-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .form-msg { font-size: 11px; margin-top: 10px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--border); }
+    .form-msg.error { border-color: var(--dot-red); color: var(--dot-red); }
+    .form-msg.success { border-color: var(--dot-green); color: var(--dot-green); }
+
+    /* Settings */
+    .settings-section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-bottom: 12px; }
+    .settings-section-title { font-size: 11px; font-weight: 600; letter-spacing: 1px; opacity: 0.5; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 12px; }
+    .setting-desc { font-size: 10px; opacity: 0.45; margin-top: 2px; }
+    .toggle { width: 36px; height: 20px; background: var(--border); border-radius: 10px; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; border: none; }
+    .toggle.on { background: var(--accent); }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--bg); border-radius: 50%; transition: transform 0.2s; }
+    .toggle.on::after { transform: translateX(16px); }
+    .settings-saved { font-size: 10px; color: var(--dot-green); opacity: 0; transition: opacity 0.4s; }
+    .settings-saved.show { opacity: 1; }
+
+    /* Archive */
+    .archive-search { width: 100%; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: inherit; font-size: 13px; color: var(--text); outline: none; margin-bottom: 12px; }
+    .archive-search:focus { border-color: var(--accent); }
+    .archive-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .archive-table th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); opacity: 0.5; font-weight: 600; letter-spacing: 0.5px; }
+    .archive-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); opacity: 0.8; vertical-align: top; }
+    .archive-table tr:hover td { background: var(--bg2); opacity: 1; }
+    .restore-btn { background: none; border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 10px; padding: 2px 7px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+    .restore-btn:hover { border-color: var(--dot-green); color: var(--dot-green); }
+    .restore-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .restore-err { background: var(--bg3); border: 1px solid var(--dot-red); border-radius: 4px; padding: 8px 12px; font-size: 11px; color: var(--dot-red); margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+    .restore-err-dismiss { background: none; border: none; color: var(--dot-red); cursor: pointer; font-size: 13px; padding: 0 4px; margin-left: auto; line-height: 1; }
+
+    /* Journal */
+    .journal-entry { background: var(--bg2); border: 1px solid var(--border); border-left: 4px solid var(--dot-purple); border-radius: 4px; padding: 14px; margin-bottom: 10px; }
+    .journal-entry-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .journal-entry-body { font-size: 12px; opacity: 0.7; white-space: pre-wrap; }
+    .journal-entry-meta { font-size: 10px; opacity: 0.35; margin-top: 8px; }
+
+    /* Fragment full view */
+    .fragment-card { background: var(--bg2); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 4px; padding: 14px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
+    .fragment-card:hover { border-color: var(--accent); background: var(--bg3); }
+    .fragment-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .fragment-card-name { font-size: 12px; font-weight: 600; flex: 1; }
+    .fragment-card-content { font-size: 12px; opacity: 0.7; white-space: pre-wrap; line-height: 1.6; }
+    .fragment-empty { font-size: 11px; opacity: 0.35; font-style: italic; }
+
+    /* EOD Banner */
+    .eod-banner { position: fixed; bottom: 44px; left: 0; right: 0; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 200; font-size: 12px; border-top: 2px solid var(--accent); background: var(--bg2); }
+    .eod-banner.warn { border-color: var(--dot-red); }
+    .eod-banner.done { border-color: var(--dot-green); }
+    .eod-banner-text { display: flex; align-items: center; gap: 10px; }
+    .eod-banner-dismiss { background: none; border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
+    .eod-banner-dismiss:hover { border-color: var(--accent); }
+
+    /* Collabs */
+    .collab-section { margin-bottom: 20px; }
+    .collab-section-title { font-size: 10px; font-weight: 600; letter-spacing: 1px; opacity: 0.45; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .badge { background: var(--dot-purple); color: #fff; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; }
+    .pending-invite { background: var(--bg2); border: 1px solid var(--dot-purple); border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+    .pending-invite-info { flex: 1; }
+    .pending-invite-node { font-size: 13px; font-weight: 600; margin-bottom: 2px; color: var(--accent); }
+    .pending-invite-from { font-size: 11px; opacity: 0.5; }
+    .pending-invite-actions { display: flex; gap: 6px; }
+    .sent-invite { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+    .invite-status { font-size: 10px; padding: 2px 7px; border-radius: 3px; border: 1px solid currentColor; }
+    .invite-status.pending { color: var(--accent); opacity: 0.7; }
+    .invite-status.accepted { color: var(--dot-green); }
+    .invite-status.declined { color: var(--dot-red); }
+    .invite-form { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .invite-form-row { display: flex; gap: 8px; align-items: flex-end; }
+    .invite-form-row .form-group { flex: 1; margin-bottom: 0; }
+
+    /* Account section */
+    .account-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .account-row:last-child { border-bottom: none; }
+    .account-label { font-size: 10px; opacity: 0.45; margin-bottom: 4px; letter-spacing: 0.5px; }
+    .account-value { font-size: 12px; }
+    .danger-btn { background: none; border: 1px solid var(--dot-red); color: var(--dot-red); font-family: inherit; font-size: 12px; padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+    .danger-btn:hover { background: var(--dot-red); color: var(--bg); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="text/babel">
+  /*
+  =========================================================
+  PHASE 1 SCHEMA — run once in Supabase SQL editor
+  =========================================================
+  CREATE TABLE nodes (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    parent_id uuid REFERENCES nodes(id) ON DELETE CASCADE,
+    area text NOT NULL CHECK (area IN ('new_day','context','collabs')),
+    level text NOT NULL CHECK (level IN ('category','note','detail','fragment')),
+    name text NOT NULL DEFAULT '',
+    content text DEFAULT '',
+    sort_order int DEFAULT 0,
+    is_project boolean DEFAULT false,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+  CREATE TABLE journal_entries (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    title text DEFAULT '',
+    content text DEFAULT '',
+    sort_order int DEFAULT 0,
+    entry_date date DEFAULT current_date,
+    archived_at timestamptz,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+  CREATE TABLE archive_rows (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    original_path text NOT NULL,
+    level text NOT NULL,
+    parent_name text DEFAULT '',
+    content text DEFAULT '',
+    archived_at timestamptz DEFAULT now()
+  );
+  CREATE TABLE collab_invites (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    node_id uuid REFERENCES nodes(id) ON DELETE CASCADE NOT NULL,
+    owner_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    invitee_email text NOT NULL,
+    invitee_id uuid REFERENCES auth.users(id),
+    status text DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+    invite_token text UNIQUE DEFAULT encode(gen_random_bytes(32),'hex'),
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+  CREATE TABLE user_settings (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    theme text DEFAULT 'night',
+    view_mode text DEFAULT 'panel',
+    life_default boolean DEFAULT true,
+    rules jsonb DEFAULT '{"notify_before_eod":true,"auto_append_matched":true,"auto_archive_unmatched":true,"auto_assign_projects_context":true,"archive_journal_at_eod":true,"keep_empty_categories":false}'::jsonb,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+  );
+  CREATE TABLE eod_log (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    processed_at timestamptz DEFAULT now(),
+    merged_count int DEFAULT 0,
+    archived_count int DEFAULT 0,
+    summary jsonb DEFAULT '{}'::jsonb
+  );
+  ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE archive_rows ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE collab_invites ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE eod_log ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "own_nodes" ON nodes USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  CREATE POLICY "own_journal" ON journal_entries USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  CREATE POLICY "own_archive" ON archive_rows USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  CREATE POLICY "own_settings" ON user_settings USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  CREATE POLICY "own_eod_log" ON eod_log USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+  CREATE POLICY "collab_invites_access" ON collab_invites USING (
+    owner_id = auth.uid() OR invitee_id = auth.uid()
+    OR invitee_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  );
+  CREATE INDEX idx_nodes_user_area ON nodes(user_id, area);
+  CREATE INDEX idx_nodes_parent ON nodes(parent_id);
+  CREATE INDEX idx_journal_user_date ON journal_entries(user_id, entry_date);
+  CREATE INDEX idx_archive_user ON archive_rows(user_id);
+  CREATE INDEX idx_collab_invitee_email ON collab_invites(invitee_email);
+
+  =========================================================
+  PHASE 4 ADDITIONS — run in Supabase SQL editor to enable collabs
+  =========================================================
+  -- Non-recursive collab read (original was dropped due to infinite recursion)
+  CREATE POLICY "collab_read_v2" ON nodes FOR SELECT USING (
+    user_id = auth.uid()
+    OR id IN (SELECT node_id FROM collab_invites WHERE invitee_id = auth.uid() AND status = 'accepted')
+  );
+  -- Allow invitees to accept/decline their invites
+  CREATE POLICY "collab_invites_update" ON collab_invites FOR UPDATE
+    USING (invitee_id = auth.uid() OR invitee_email = (SELECT email FROM auth.users WHERE id = auth.uid()))
+    WITH CHECK (true);
+  =========================================================
+  */
+
+  // ── Supabase ─────────────────────────────────────────
+  const SUPABASE_URL = 'https://gcsfupdmyubwpoxbvnru.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdjc2Z1cGRteXVid3BveGJ2bnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTg0MzksImV4cCI6MjA5Njg3NDQzOX0._FXHWw8ad7DxzxThajksbF23rSHc6_3aCrNnWq3UOxc';
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ── DB helpers ───────────────────────────────────────
+  const DB = {
+    async getNodes(userId, area) {
+      const { data, error } = await db.from('nodes').select('*').eq('user_id', userId).eq('area', area).order('sort_order', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    async createNode(node) {
+      const { data, error } = await db.from('nodes').insert([node]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async updateNode(id, updates) {
+      const { data, error } = await db.from('nodes').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async deleteNode(id) {
+      const { error } = await db.from('nodes').delete().eq('id', id);
+      if (error) throw error;
+    },
+    async getTodayJournal(userId) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await db.from('journal_entries').select('*').eq('user_id', userId).eq('entry_date', today).is('archived_at', null).order('sort_order', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    async createJournalEntry(entry) {
+      const { data, error } = await db.from('journal_entries').insert([entry]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async updateJournalEntry(id, updates) {
+      const { data, error } = await db.from('journal_entries').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async deleteJournalEntry(id) {
+      const { error } = await db.from('journal_entries').delete().eq('id', id);
+      if (error) throw error;
+    },
+    async getArchiveRows(userId, search = '') {
+      let q = db.from('archive_rows').select('*').eq('user_id', userId).order('archived_at', { ascending: false }).limit(200);
+      if (search.trim()) q = q.or(`original_path.ilike.%${search}%,parent_name.ilike.%${search}%,content.ilike.%${search}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+    async getArchiveCount(userId) {
+      const { count, error } = await db.from('archive_rows').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+      if (error) throw error;
+      return count || 0;
+    },
+    async addArchiveRow(row) {
+      const { data, error } = await db.from('archive_rows').insert([row]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async getSettings(userId) {
+      const { data, error } = await db.from('user_settings').select('*').eq('user_id', userId).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    async upsertSettings(userId, settings) {
+      const { data, error } = await db.from('user_settings').upsert({ user_id: userId, ...settings, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async getEodLog(userId) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await db.from('eod_log').select('*').eq('user_id', userId).gte('processed_at', today + 'T00:00:00').order('processed_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    async addEodLog(userId, mergedCount, archivedCount, summary) {
+      const { error } = await db.from('eod_log').insert([{ user_id: userId, merged_count: mergedCount, archived_count: archivedCount, summary }]);
+      if (error) throw error;
+    },
+    async getPendingInvites() {
+      const { data, error } = await db.from('collab_invites').select('*, node:node_id(id, name, area)').eq('status', 'pending');
+      if (error) throw error;
+      return data || [];
+    },
+    async getSentInvites(userId) {
+      const { data, error } = await db.from('collab_invites').select('*, node:node_id(id, name)').eq('owner_id', userId).order('created_at', { ascending: false }).limit(20);
+      if (error) throw error;
+      return data || [];
+    },
+    async createCollabInvite(invite) {
+      const { data, error } = await db.from('collab_invites').insert([invite]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    async respondCollabInvite(id, status, userId) {
+      const updates = { status, updated_at: new Date().toISOString() };
+      if (status === 'accepted') updates.invitee_id = userId;
+      const { error } = await db.from('collab_invites').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+  };
+
+  // ── Constants ────────────────────────────────────────
+  const DEFAULT_SETTINGS = {
+    theme: 'night',
+    view_mode: 'panel',
+    life_default: true,
+    rules: {
+      notify_before_eod: true,
+      auto_append_matched: true,
+      auto_archive_unmatched: true,
+      auto_assign_projects_context: true,
+      archive_journal_at_eod: true,
+      keep_empty_categories: false,
+    },
+  };
+
+  const RULES_META = [
+    { id: 'notify_before_eod', name: 'Notify Before End of Day', desc: 'Show 30-min warning at 11:30 PM' },
+    { id: 'auto_append_matched', name: 'Auto-Append Matched', desc: 'Append green-dot fragment content to context at 11:59:59 PM' },
+    { id: 'auto_archive_unmatched', name: 'Auto-Archive Unmatched', desc: 'Archive red-dot categories to flat archive at EOD' },
+    { id: 'auto_assign_projects_context', name: 'Auto-Assign Projects to Context', desc: 'Create matching context entry for any project node' },
+    { id: 'archive_journal_at_eod', name: 'Archive Journal at End of Day', desc: 'Archive all journal entries at 11:59:59 PM' },
+    { id: 'keep_empty_categories', name: 'Keep Empty Categories', desc: 'Do not delete empty new_day categories after EOD' },
+  ];
+
+  const CONTENTS = [
+    { key: 'settings', label: 'SETT' }, { key: 'new_day', label: 'NEWD' }, { key: 'context', label: 'CONT' },
+    { key: 'journal', label: 'JOUR' }, { key: 'archive', label: 'ARCH' }, { key: 'collabs', label: 'COLL' },
+  ];
+
+  const LEVELS = ['category','note','detail','fragment'];
+  function nextLevel(level) { return LEVELS[LEVELS.indexOf(level)+1] || null; }
+  function levelLabel(level) { return level || 'item'; }
+
+  const LIFE_SEED = [
+    { note: 'today', details: ['quotes', 'gratitudes'] },
+    { note: 'journal', details: [] },
+    { note: 'plans', details: ['goals', 'people', 'places', 'events', 'things'] },
+    { note: 'reviews', details: ['books', 'movies', 'experiences', 'music'] },
+    { note: 'projects', details: ['personal', 'work', 'creative'] },
+    { note: 'portfolio', details: ['work', 'creative'] },
+    { note: 'drawing', details: ['sketches'] },
+  ];
+
+  // ── Seed ─────────────────────────────────────────────
+  async function seedLifeForUser(userId) {
+    for (const area of ['new_day', 'context']) {
+      const cat = await DB.createNode({ user_id: userId, parent_id: null, area, level: 'category', name: 'life', content: '', sort_order: 0 });
+      for (let ni = 0; ni < LIFE_SEED.length; ni++) {
+        const { note, details } = LIFE_SEED[ni];
+        const noteNode = await DB.createNode({ user_id: userId, parent_id: cat.id, area, level: 'note', name: note, content: '', sort_order: ni });
+        for (let di = 0; di < details.length; di++) {
+          await DB.createNode({ user_id: userId, parent_id: noteNode.id, area, level: 'detail', name: details[di], content: '', sort_order: di });
+        }
+      }
+    }
+  }
+
+  // ── Tree utils ───────────────────────────────────────
+  function buildTree(flatNodes) {
+    const map = {};
+    flatNodes.forEach(n => { map[n.id] = { ...n, children: [] }; });
+    const roots = [];
+    flatNodes.forEach(n => {
+      if (n.parent_id && map[n.parent_id]) map[n.parent_id].children.push(map[n.id]);
+      else roots.push(map[n.id]);
+    });
+    function sort(node) { node.children.sort((a,b) => a.sort_order - b.sort_order); node.children.forEach(sort); }
+    roots.sort((a,b) => a.sort_order - b.sort_order);
+    roots.forEach(sort);
+    return roots;
+  }
+
+  function findNodeByPath(tree, pathSegs) {
+    if (!pathSegs || pathSegs.length === 0) return null;
+    let current = tree; let node = null;
+    for (const seg of pathSegs) {
+      node = (current || []).find(n => n.name === seg);
+      if (!node) return null;
+      current = node.children;
+    }
+    return node;
+  }
+
+  function computeDot(node, pathFromCategory, contextTree) {
+    if (pathFromCategory[1] === 'journal' || pathFromCategory[0] === 'journal') return 'purple';
+    return findNodeByPath(contextTree, pathFromCategory) ? 'green' : 'red';
+  }
+
+  function SlotBar({ filled, total = 10 }) {
+    return (
+      <div className="slot-bar">
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} className={`slot-pip${i < filled ? ' filled' : ''}`} />
+        ))}
+      </div>
+    );
+  }
+
+  // ── EOD processing ───────────────────────────────────
+  async function runEODProcessing(userId, rules, nodes, journalEntries) {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const last = await DB.getEodLog(userId);
+      if (last && last.processed_at && last.processed_at.startsWith(today)) return { skipped: true };
+    } catch(e) {}
+
+    const ndTree = buildTree(nodes.new_day || []);
+    const ctxTree = buildTree(nodes.context || []);
+    let merged = 0, archived = 0;
+
+    async function archiveTree(node, path) {
+      try {
+        await DB.addArchiveRow({ user_id: userId, original_path: `new_day.${path.join('.')}`, level: node.level, parent_name: path.length > 1 ? path[path.length-2] : 'new_day', content: node.content || '' });
+        archived++;
+      } catch(e) {}
+      for (const child of (node.children || [])) await archiveTree(child, [...path, child.name]);
+    }
+
+    async function appendFragments(ndNode, ctxNode) {
+      if (!ctxNode) return;
+      if (ndNode.level === 'fragment' && ndNode.content) {
+        const siblings = (ctxNode.children || []).length;
+        if (siblings < 10) {
+          try {
+            await DB.createNode({ user_id: userId, area: 'context', parent_id: ctxNode.id, level: 'fragment', name: ndNode.name, content: ndNode.content, sort_order: siblings });
+            merged++;
+          } catch(e) {}
+        }
+      }
+      for (const child of (ndNode.children || [])) {
+        const ctxChild = (ctxNode.children || []).find(c => c.name === child.name);
+        await appendFragments(child, ctxChild);
+      }
+    }
+
+    if (rules.auto_append_matched || rules.auto_archive_unmatched) {
+      for (const cat of ndTree) {
+        const dot = computeDot(cat, [cat.name], ctxTree);
+        if (dot === 'purple') continue;
+        if (dot === 'green' && rules.auto_append_matched) {
+          const ctxCat = ctxTree.find(c => c.name === cat.name);
+          await appendFragments(cat, ctxCat);
+          await archiveTree(cat, [cat.name]);
+          try { await DB.deleteNode(cat.id); } catch(e) {}
+        } else if (dot === 'red' && rules.auto_archive_unmatched) {
+          await archiveTree(cat, [cat.name]);
+          try { await DB.deleteNode(cat.id); } catch(e) {}
+        }
+      }
+    }
+
+    if (rules.archive_journal_at_eod) {
+      for (const entry of (journalEntries || [])) {
+        const title = entry.title || `entry_${entry.sort_order}`;
+        try {
+          await DB.addArchiveRow({ user_id: userId, original_path: `journal.${today}.${title}`, level: 'journal_entry', parent_name: today, content: entry.content || '' });
+          await DB.updateJournalEntry(entry.id, { archived_at: new Date().toISOString() });
+          archived++;
+        } catch(e) {}
+      }
+    }
+
+    try { await DB.addEodLog(userId, merged, archived, { date: today }); } catch(e) {}
+    return { merged, archived };
+  }
+
+  function useEODTimer(userId, onWarn, onComplete) {
+    const userIdRef = React.useRef(userId);
+    const onWarnRef = React.useRef(onWarn);
+    const onCompleteRef = React.useRef(onComplete);
+    React.useEffect(() => { userIdRef.current = userId; }, [userId]);
+    React.useEffect(() => { onWarnRef.current = onWarn; }, [onWarn]);
+    React.useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+    React.useEffect(() => {
+      if (!userId) return;
+      function msUntil(h, m, s) {
+        const now = new Date();
+        const t = new Date(now);
+        t.setHours(h, m, s, 0);
+        if (t <= now) t.setDate(t.getDate() + 1);
+        return t - now;
+      }
+      const warnTimer = setTimeout(() => onWarnRef.current && onWarnRef.current(), msUntil(23, 30, 0));
+      const eodTimer = setTimeout(() => onCompleteRef.current && onCompleteRef.current(), msUntil(23, 59, 59));
+      return () => { clearTimeout(warnTimer); clearTimeout(eodTimer); };
+    }, [userId]);
+  }
+
+  // ── Archive restore ───────────────────────────────────
+  async function restoreArchiveRow(row, userId) {
+    const parts = row.original_path.split('.');
+    if (parts.length < 2) throw new Error('Cannot restore: invalid archive path.');
+    const area = parts[0];
+    const pathInArea = parts.slice(1);
+    const name = pathInArea[pathInArea.length - 1];
+    const parentPath = pathInArea.slice(0, -1);
+    const level = row.level;
+
+    if (area === 'journal') {
+      await DB.createJournalEntry({ user_id: userId, title: name, content: row.content || '', entry_date: new Date().toISOString().split('T')[0], sort_order: 0 });
+      return { area: 'journal' };
+    }
+
+    if (!['new_day','context','collabs'].includes(area)) throw new Error(`Cannot restore to area: ${area}`);
+
+    const currentNodes = await DB.getNodes(userId, area);
+    const tree = buildTree(currentNodes);
+    let parentNode = null;
+    let siblings = tree;
+
+    if (parentPath.length > 0) {
+      parentNode = findNodeByPath(tree, parentPath);
+      if (!parentNode) throw new Error(`restore_blocked: Parent path "${parentPath.join('.')}" not found. Create the parent structure first.`);
+      siblings = parentNode.children || [];
+    }
+
+    if (siblings.length >= 10) {
+      const loc = parentNode ? `"${parentNode.name}"` : area;
+      throw new Error(`restore_blocked: ${loc} is at capacity (10/10). Free a slot before restoring.`);
+    }
+    if (siblings.some(s => s.name === name)) throw new Error(`An item named "${name}" already exists at this location.`);
+
+    await DB.createNode({ user_id: userId, area, parent_id: parentNode ? parentNode.id : null, level, name, content: row.content || '', sort_order: siblings.length });
+    return { area };
+  }
+
+  // ── Auth ─────────────────────────────────────────────
+  function useAuth() {
+    const [user, setUser] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    React.useEffect(() => {
+      db.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setLoading(false); });
+      const { data: { subscription } } = db.auth.onAuthStateChange((_e, session) => { setUser(session?.user ?? null); setLoading(false); });
+      return () => subscription.unsubscribe();
+    }, []);
+    return { user, loading };
+  }
+
+  function AuthModal() {
+    const [tab, setTab] = React.useState('signin');
+    const [email, setEmail] = React.useState('');
+    const [password, setPassword] = React.useState('');
+    const [submitting, setSubmitting] = React.useState(false);
+    const [msg, setMsg] = React.useState(null);
+
+    async function handleSubmit(e) {
+      e.preventDefault(); setSubmitting(true); setMsg(null);
+      try {
+        if (tab === 'signin') { const { error } = await db.auth.signInWithPassword({ email, password }); if (error) throw error; }
+        else if (tab === 'signup') { const { error } = await db.auth.signUp({ email, password }); if (error) throw error; setMsg({ type: 'success', text: 'Check your email to confirm your account.' }); }
+        else { const { error } = await db.auth.resetPasswordForEmail(email); if (error) throw error; setMsg({ type: 'success', text: 'Password reset email sent.' }); }
+      } catch(err) { setMsg({ type: 'error', text: err.message }); }
+      finally { setSubmitting(false); }
+    }
+
+    return (
+      <div className="modal-overlay">
+        <div className="modal">
+          <div className="modal-title">Night_OS</div>
+          <div className="modal-tabs">
+            {[['signin','Sign In'],['signup','Create Account'],['forgot','Forgot']].map(([t, label]) => (
+              <button key={t} className={`modal-tab${tab===t?' active':''}`} onClick={() => { setTab(t); setMsg(null); }}>{label}</button>
+            ))}
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">EMAIL</label>
+              <input type="email" className="form-input" value={email} onChange={e=>setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
+            </div>
+            {tab !== 'forgot' && (
+              <div className="form-group">
+                <label className="form-label">PASSWORD</label>
+                <input type="password" className="form-input" value={password} onChange={e=>setPassword(e.target.value)} required placeholder="••••••••" />
+              </div>
+            )}
+            <button type="submit" className="form-btn" disabled={submitting}>
+              {submitting ? 'Please wait...' : tab === 'signin' ? 'Sign In' : tab === 'signup' ? 'Create Account' : 'Send Reset Email'}
+            </button>
+            {msg && <div className={`form-msg ${msg.type}`}>{msg.text}</div>}
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────
+  function Header({ path, onNavigate, user, settings, onSettingsChange }) {
+    const AREA_LABELS = { settings:'SETT', new_day:'NEWD', context:'CONT', journal:'JOUR', archive:'ARCH', collabs:'COLL' };
+    function toggleTheme() { const next = settings.theme === 'night' ? 'day' : 'night'; onSettingsChange({ ...settings, theme: next }); }
+    return (
+      <div className="header">
+        <div className="header-logo" onClick={() => onNavigate([])}>Night_OS</div>
+        <div className="breadcrumb">
+          <span className="breadcrumb-seg" onClick={() => onNavigate([])}>root</span>
+          {path.map((seg, i) => (
+            <React.Fragment key={i}>
+              <span className="breadcrumb-sep">›</span>
+              <span className="breadcrumb-seg" onClick={() => onNavigate(path.slice(0, i+1))}>
+                {AREA_LABELS[seg] ? AREA_LABELS[seg].toLowerCase() : seg}
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="header-right">
+          <span className="header-email">{user?.email}</span>
+          <button className="hbtn" onClick={toggleTheme} title="Toggle theme">{settings.theme === 'night' ? '☀' : '🌙'}</button>
+          <button className="hbtn" onClick={() => onNavigate(['settings'])} title="Settings">⚙</button>
+          <button className="hbtn" onClick={() => db.auth.signOut()}>Sign out</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Map Module ────────────────────────────────────────
+  function MapModule({ path, nodes, onNavigate }) {
+    const rows = [];
+    rows.push(
+      <div key="contents" className="map-row">
+        {CONTENTS.map(c => (
+          <div key={c.key} className={`map-box${path[0]===c.key?' active':''}`} onClick={() => onNavigate([c.key])}>{c.label}</div>
+        ))}
+      </div>
+    );
+    if (path[0] === 'new_day' || path[0] === 'context') {
+      const area = path[0];
+      const tree = buildTree(nodes[area] || []);
+      const levels = [tree];
+      for (let i = 1; i < path.length; i++) {
+        const p = findNodeByPath(tree, path.slice(1, i+1));
+        if (p && p.children.length > 0) levels.push(p.children);
+        else break;
+      }
+      for (let lvl = 0; lvl < levels.length && lvl < 4; lvl++) {
+        const items = levels[lvl]; const activeName = path[lvl+1];
+        rows.push(
+          <div key={`lvl-${lvl}`} className="map-row">
+            {items.map(item => (
+              <div key={item.id} className={`map-box${activeName===item.name?' active':''}`} onClick={() => onNavigate([area, ...path.slice(1, lvl+1), item.name])}>
+                {item.name.slice(0,4).toUpperCase()}
+              </div>
+            ))}
+          </div>
+        );
+      }
+    }
+    return <div className="map-module">{rows}</div>;
+  }
+
+  // ── AddNodeModal ──────────────────────────────────────
+  function AddNodeModal({ area, parentId, level, siblingCount, userId, onClose, onSaved }) {
+    const [name, setName] = React.useState('');
+    const [content, setContent] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState('');
+
+    if (siblingCount >= 10) return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">Slots Full</div>
+          <p style={{fontSize:'12px',opacity:0.7,marginBottom:16}}>This level has 10/10 items — the maximum allowed. Free a slot to continue.</p>
+          <button className="form-btn" onClick={onClose}>OK</button>
+        </div>
+      </div>
+    );
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!name.trim()) { setErr('Name is required.'); return; }
+      setBusy(true); setErr('');
+      try {
+        await DB.createNode({ user_id: userId, area, parent_id: parentId || null, level, name: name.trim(), content: content.trim(), sort_order: siblingCount });
+        onSaved();
+      } catch(ex) { setErr(ex.message || 'Error creating item.'); }
+      finally { setBusy(false); }
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">New {levelLabel(level)}</div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">NAME</label>
+              <input className="form-input" value={name} onChange={e=>setName(e.target.value)} autoFocus placeholder={`${levelLabel(level)} name`} />
+            </div>
+            {level === 'fragment' && (
+              <div className="form-group">
+                <label className="form-label">CONTENT</label>
+                <textarea className="form-input" rows={4} value={content} onChange={e=>setContent(e.target.value)} placeholder="Fragment content..." style={{resize:'vertical'}} />
+              </div>
+            )}
+            {err && <div className="form-msg error">{err}</div>}
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <button className="form-btn" type="submit" disabled={busy} style={{flex:1}}>{busy?'Saving...':'Create'}</button>
+              <button type="button" className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EditNodeModal ─────────────────────────────────────
+  function EditNodeModal({ node, onClose, onSaved }) {
+    const [name, setName] = React.useState(node.name || '');
+    const [content, setContent] = React.useState(node.content || '');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState('');
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!name.trim()) { setErr('Name is required.'); return; }
+      setBusy(true); setErr('');
+      try { await DB.updateNode(node.id, { name: name.trim(), content: content.trim() }); onSaved(); }
+      catch(ex) { setErr(ex.message || 'Error saving.'); }
+      finally { setBusy(false); }
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">Edit {node.level}</div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">NAME</label>
+              <input className="form-input" value={name} onChange={e=>setName(e.target.value)} autoFocus />
+            </div>
+            {(node.level === 'fragment' || node.level === 'detail') && (
+              <div className="form-group">
+                <label className="form-label">CONTENT</label>
+                <textarea className="form-input" rows={5} value={content} onChange={e=>setContent(e.target.value)} style={{resize:'vertical'}} placeholder="Content..." />
+              </div>
+            )}
+            {err && <div className="form-msg error">{err}</div>}
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <button className="form-btn" type="submit" disabled={busy} style={{flex:1}}>{busy?'Saving...':'Save'}</button>
+              <button type="button" className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── DeleteNodeConfirm ─────────────────────────────────
+  function DeleteNodeConfirm({ node, onClose, onDeleted }) {
+    const [busy, setBusy] = React.useState(false);
+    const hasChildren = node.children && node.children.length > 0;
+    async function handleDelete() {
+      setBusy(true);
+      try { await DB.deleteNode(node.id); onDeleted(); }
+      catch(ex) { alert('Delete failed: ' + (ex.message||ex)); setBusy(false); }
+    }
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">Delete {node.level}?</div>
+          <p style={{fontSize:'12px',opacity:0.7,marginBottom:16}}>
+            Delete <strong style={{color:'var(--accent)'}}>{node.name}</strong>?
+            {hasChildren && <><br/><span style={{color:'var(--dot-red)'}}>Also deletes {node.children.length} child item{node.children.length!==1?'s':''}.</span></>}
+          </p>
+          <div style={{display:'flex',gap:8}}>
+            <button className="form-btn" onClick={handleDelete} disabled={busy} style={{flex:1,background:'var(--dot-red)'}}>{busy?'Deleting...':'Delete'}</button>
+            <button className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── AddJournalModal ───────────────────────────────────
+  function AddJournalModal({ userId, entryCount, onClose, onSaved }) {
+    const [title, setTitle] = React.useState('');
+    const [content, setContent] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState('');
+
+    if (entryCount >= 10) return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">Journal Full</div>
+          <p style={{fontSize:'12px',opacity:0.7,marginBottom:16}}>10/10 journal entries today — the maximum. Delete one to free a slot.</p>
+          <button className="form-btn" onClick={onClose}>OK</button>
+        </div>
+      </div>
+    );
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!content.trim() && !title.trim()) { setErr('Add a title or content.'); return; }
+      setBusy(true); setErr('');
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        await DB.createJournalEntry({ user_id: userId, title: title.trim(), content: content.trim(), entry_date: today, sort_order: entryCount });
+        onSaved();
+      } catch(ex) { setErr(ex.message||'Error saving entry.'); }
+      finally { setBusy(false); }
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">New Journal Entry</div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">TITLE (optional)</label>
+              <input className="form-input" value={title} onChange={e=>setTitle(e.target.value)} autoFocus placeholder="Leave blank for today's date" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">CONTENT</label>
+              <textarea className="form-input" rows={5} value={content} onChange={e=>setContent(e.target.value)} placeholder="Write your entry..." style={{resize:'vertical'}} />
+            </div>
+            {err && <div className="form-msg error">{err}</div>}
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <button className="form-btn" type="submit" disabled={busy} style={{flex:1}}>{busy?'Saving...':'Save Entry'}</button>
+              <button type="button" className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EditJournalModal ──────────────────────────────────
+  function EditJournalModal({ entry, onClose, onSaved }) {
+    const [title, setTitle] = React.useState(entry.title||'');
+    const [content, setContent] = React.useState(entry.content||'');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState('');
+
+    async function handleSubmit(e) {
+      e.preventDefault(); setBusy(true); setErr('');
+      try { await DB.updateJournalEntry(entry.id, { title: title.trim(), content: content.trim() }); onSaved(); }
+      catch(ex) { setErr(ex.message||'Save failed.'); }
+      finally { setBusy(false); }
+    }
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e=>e.stopPropagation()}>
+          <div className="modal-title">Edit Entry</div>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">TITLE</label>
+              <input className="form-input" value={title} onChange={e=>setTitle(e.target.value)} autoFocus />
+            </div>
+            <div className="form-group">
+              <label className="form-label">CONTENT</label>
+              <textarea className="form-input" rows={5} value={content} onChange={e=>setContent(e.target.value)} style={{resize:'vertical'}} />
+            </div>
+            {err && <div className="form-msg error">{err}</div>}
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <button className="form-btn" type="submit" disabled={busy} style={{flex:1}}>{busy?'Saving...':'Save'}</button>
+              <button type="button" className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── WorkspaceView ─────────────────────────────────────
+  function WorkspaceView({ area, path, nodes, contextNodes, viewMode, onNavigate, onReload, userId }) {
+    const [addModal, setAddModal] = React.useState(false);
+    const [editModal, setEditModal] = React.useState(null);
+    const [deleteModal, setDeleteModal] = React.useState(null);
+
+    const relPath = path.slice(1);
+    const areaNodes = nodes[area] || [];
+    const tree = buildTree(areaNodes);
+    const contextTree = buildTree(contextNodes || []);
+
+    let parentNode = null;
+    let currentItems = tree;
+    let currentLevel = 'category';
+
+    if (relPath.length > 0) {
+      parentNode = findNodeByPath(tree, relPath);
+      currentItems = parentNode ? parentNode.children : [];
+      currentLevel = relPath.length === 1 ? 'note' : relPath.length === 2 ? 'detail' : 'fragment';
+    }
+
+    function getDotClass(node) {
+      if (area !== 'new_day') return null;
+      const pathFromCat = relPath.length === 0 ? [node.name] : [...relPath, node.name];
+      return computeDot(node, pathFromCat, contextTree);
+    }
+
+    function handleNodeClick(node) {
+      if (node.level === 'fragment') setEditModal(node);
+      else onNavigate([area, ...relPath, node.name]);
+    }
+
+    const canAdd = currentLevel !== 'fragment' ? true : (currentItems.length < 10);
+    const nextLvl = relPath.length === 0 ? 'category' : nextLevel(relPath.length <= 3 ? LEVELS[relPath.length - 1] : 'fragment');
+
+    function renderFragmentView() {
+      if (!parentNode) return <div className="empty-hint">Navigate to a detail to see fragments.</div>;
+      return (
+        <div>
+          <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
+            {area} · {relPath.join(' › ')}
+            <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
+            <button className="hbtn" style={{marginLeft:'auto'}} onClick={() => setAddModal(true)}>+ New fragment</button>
+          </div>
+          {currentItems.length === 0 && <div className="empty-hint">No fragments yet. Add one to start.</div>}
+          {currentItems.map(node => {
+            const dot = getDotClass(node);
+            return (
+              <div key={node.id} className="fragment-card" onClick={() => setEditModal(node)}>
+                <div className="fragment-card-header">
+                  {dot && <div className={`dot dot-${dot}`} title={dot} />}
+                  <span className="fragment-card-name">{node.name}</span>
+                  <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
+                  <button className="icon-btn danger" onClick={e => { e.stopPropagation(); setDeleteModal(node); }} title="Delete">✕</button>
+                </div>
+                {node.content
+                  ? <div className="fragment-card-content">{node.content}</div>
+                  : <div className="fragment-empty">no content — click to add</div>
+                }
+              </div>
+            );
+          })}
+          {addModal && <AddNodeModal area={area} parentId={parentNode.id} level="fragment" siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
+          {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
+          {deleteModal && <DeleteNodeConfirm node={deleteModal} onClose={() => setDeleteModal(null)} onDeleted={() => { setDeleteModal(null); onReload(area); }} />}
+        </div>
+      );
+    }
+
+    if (currentLevel === 'fragment') return renderFragmentView();
+
+    function renderNode(node) {
+      const dot = getDotClass(node);
+      const childCount = node.children ? node.children.length : 0;
+      if (viewMode === 'panel') {
+        return (
+          <div key={node.id} className="panel-card" onClick={() => handleNodeClick(node)}>
+            <div className="card-top">
+              {dot && <div className={`dot dot-${dot}`} title={dot} />}
+              <span className="card-name">{node.name}</span>
+              <div className="card-actions">
+                <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
+                <button className="icon-btn danger" onClick={e => { e.stopPropagation(); setDeleteModal(node); }} title="Delete">✕</button>
+              </div>
+            </div>
+            {node.level !== 'fragment' && <div className="card-sub">{childCount}/10</div>}
+            {node.level !== 'fragment' && <SlotBar filled={childCount} />}
+            {node.content && <div className="card-content-preview">{node.content}</div>}
+          </div>
+        );
+      }
+      return (
+        <div key={node.id} className="list-row" onClick={() => handleNodeClick(node)}>
+          {dot && <div className={`dot dot-${dot}`} title={dot} />}
+          <span className="list-row-name">{node.name}</span>
+          {node.content && <span className="list-row-content">{node.content}</span>}
+          {node.level !== 'fragment' && <span className="list-row-sub">{childCount}/10</span>}
+          <div className="list-row-actions">
+            <button className="icon-btn" onClick={e => { e.stopPropagation(); setEditModal(node); }} title="Edit">✎</button>
+            <button className="icon-btn danger" onClick={e => { e.stopPropagation(); setDeleteModal(node); }} title="Delete">✕</button>
+          </div>
+        </div>
+      );
+    }
+
+    const heading = relPath.length === 0 ? area : `${area} › ${relPath.join(' › ')}`;
+    const addLevel = relPath.length === 0 ? 'category' : (nextLevel(LEVELS[relPath.length - 1]) || 'fragment');
+    const addParentId = parentNode ? parentNode.id : null;
+
+    return (
+      <div>
+        {deleteModal && <DeleteNodeConfirm node={deleteModal} onClose={() => setDeleteModal(null)} onDeleted={() => { setDeleteModal(null); onReload(area); }} />}
+        {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
+        {addModal && <AddNodeModal area={area} parentId={addParentId} level={addLevel} siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
+        <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
+          {heading}
+          <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
+          <button className="hbtn" style={{marginLeft:'auto'}} onClick={() => setAddModal(true)}>+ New {addLevel}</button>
+        </div>
+        {currentItems.length === 0 && <div className="empty-hint">Empty. Add a {addLevel} to start.</div>}
+        {viewMode === 'panel'
+          ? <div className="panel-grid">{currentItems.map(renderNode)}</div>
+          : <div className="standard-list">{currentItems.map(renderNode)}</div>
+        }
+      </div>
+    );
+  }
+
+  // ── JournalView ───────────────────────────────────────
+  function JournalView({ journalEntries, userId, onReload }) {
+    const [addModal, setAddModal] = React.useState(false);
+    const [editModal, setEditModal] = React.useState(null);
+    const [confirmDelete, setConfirmDelete] = React.useState(null);
+    const [deleting, setDeleting] = React.useState(false);
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    async function handleDelete(entry) {
+      setDeleting(true);
+      try { await DB.deleteJournalEntry(entry.id); onReload(); }
+      catch(e) { alert('Delete failed: ' + e.message); }
+      finally { setDeleting(false); setConfirmDelete(null); }
+    }
+
+    return (
+      <div>
+        {addModal && <AddJournalModal userId={userId} entryCount={journalEntries.length} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(); }} />}
+        {editModal && <EditJournalModal entry={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(); }} />}
+        {confirmDelete && (
+          <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()}>
+              <div className="modal-title">Delete entry?</div>
+              <p style={{fontSize:'12px',opacity:0.7,marginBottom:16}}>Delete <strong style={{color:'var(--accent)'}}>{confirmDelete.title || 'this entry'}</strong>? This cannot be undone.</p>
+              <div style={{display:'flex',gap:8}}>
+                <button className="form-btn" onClick={() => handleDelete(confirmDelete)} disabled={deleting} style={{flex:1,background:'var(--dot-red)'}}>{deleting?'Deleting...':'Delete'}</button>
+                <button className="hbtn" onClick={() => setConfirmDelete(null)} style={{padding:'8px 16px'}}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
+          journal
+          <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{journalEntries.length}/10</span>
+          <button className="hbtn" style={{marginLeft:'auto'}} onClick={() => setAddModal(true)}>+ New Entry</button>
+        </div>
+        <div className="section-count">{today} · archived at midnight</div>
+        {journalEntries.length === 0 && <div className="empty-hint">No journal entries today. Click "+ New Entry" to start.</div>}
+        {journalEntries.map(entry => (
+          <div key={entry.id} className="journal-entry">
+            <div className="journal-entry-title">
+              <div className="dot dot-purple" />
+              <span style={{flex:1}}>{entry.title || new Date(entry.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+              <button className="icon-btn" onClick={() => setEditModal(entry)} title="Edit">✎</button>
+              <button className="icon-btn danger" onClick={() => setConfirmDelete(entry)} title="Delete">✕</button>
+            </div>
+            {entry.content && <div className="journal-entry-body">{entry.content}</div>}
+            <div className="journal-entry-meta">{new Date(entry.created_at).toLocaleTimeString()} · purple dot · archived at midnight</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── ArchiveView ───────────────────────────────────────
+  function ArchiveView({ userId, onReload }) {
+    const [rows, setRows] = React.useState([]);
+    const [count, setCount] = React.useState(0);
+    const [search, setSearch] = React.useState('');
+    const [loading, setLoading] = React.useState(true);
+    const [restoring, setRestoring] = React.useState(null);
+    const [restoreErr, setRestoreErr] = React.useState('');
+
+    async function load() {
+      setLoading(true);
+      try {
+        const [r, c] = await Promise.all([DB.getArchiveRows(userId, search), DB.getArchiveCount(userId)]);
+        setRows(r); setCount(c);
+      } catch(e) { console.warn(e); }
+      finally { setLoading(false); }
+    }
+
+    React.useEffect(() => { load(); }, [search]);
+
+    async function handleRestore(row) {
+      setRestoring(row.id); setRestoreErr('');
+      try {
+        const result = await restoreArchiveRow(row, userId);
+        if (result.area && onReload) onReload(result.area);
+        await load();
+      } catch(e) { setRestoreErr(e.message || 'Restore failed.'); }
+      finally { setRestoring(null); }
+    }
+
+    return (
+      <div>
+        <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
+          archive
+          <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{count}/10,000</span>
+        </div>
+        {restoreErr && (
+          <div className="restore-err">
+            <span style={{flex:1}}>{restoreErr}</span>
+            <button className="restore-err-dismiss" onClick={() => setRestoreErr('')}>✕</button>
+          </div>
+        )}
+        <input className="archive-search" placeholder="Search paths, names, content..." value={search} onChange={e => setSearch(e.target.value)} />
+        {loading ? <div className="loading">Loading archive...</div> : (
+          rows.length === 0 ? (
+            <div className="empty-hint">{search ? 'No matches.' : 'Archive is empty. Items arrive here at end of day.'}</div>
+          ) : (
+            <table className="archive-table">
+              <thead>
+                <tr><th>Path</th><th>Level</th><th>Content</th><th>Archived</th><th></th></tr>
+              </thead>
+              <tbody>
+                {rows.map(row => (
+                  <tr key={row.id}>
+                    <td style={{fontWeight:500,maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.original_path}</td>
+                    <td style={{opacity:0.5,whiteSpace:'nowrap'}}>{row.level}</td>
+                    <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',opacity:0.6}}>{row.content || '—'}</td>
+                    <td style={{opacity:0.45,whiteSpace:'nowrap'}}>{new Date(row.archived_at).toLocaleDateString()}</td>
+                    <td>
+                      <button className="restore-btn" disabled={restoring === row.id} onClick={() => handleRestore(row)}>
+                        {restoring === row.id ? '...' : 'Restore'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        )}
+      </div>
+    );
+  }
+
+  // ── SettingsView ──────────────────────────────────────
+  function SettingsView({ settings, onSettingsChange, saveStatus, user }) {
+    const s = settings;
+    const rules = s.rules || {};
+
+    function toggle(key, val) { onSettingsChange({ ...s, [key]: val }); }
+    function toggleRule(id) { onSettingsChange({ ...s, rules: { ...rules, [id]: !rules[id] } }); }
+
+    return (
+      <div>
+        <div className="section-heading" style={{display:'flex',alignItems:'center'}}>
+          settings
+          <span className={`settings-saved${saveStatus === 'saved' ? ' show' : ''}`} style={{marginLeft:12}}>saved ✓</span>
+          {saveStatus === 'saving' && <span style={{fontSize:10,opacity:0.4,marginLeft:12}}>saving...</span>}
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">Appearance</div>
+          <div className="setting-row">
+            <div><div className="setting-label">Theme</div><div className="setting-desc">Night (dark) or Day (warm light)</div></div>
+            <div style={{display:'flex',gap:6}}>
+              {['night','day'].map(t => (
+                <button key={t} className={`hbtn${s.theme === t ? ' active' : ''}`} style={s.theme===t?{borderColor:'var(--accent)',color:'var(--accent)'}:{}} onClick={() => toggle('theme', t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div className="setting-row">
+            <div><div className="setting-label">View Mode</div><div className="setting-desc">Panel (grid cards) or Standard (list rows)</div></div>
+            <div style={{display:'flex',gap:6}}>
+              {['panel','standard'].map(v => (
+                <button key={v} className="hbtn" style={s.view_mode===v?{borderColor:'var(--accent)',color:'var(--accent)'}:{}} onClick={() => toggle('view_mode', v)}>{v}</button>
+              ))}
+            </div>
+          </div>
+          <div className="setting-row">
+            <div><div className="setting-label">Life Default</div><div className="setting-desc">Seed life structure on first login</div></div>
+            <button className={`toggle${s.life_default ? ' on' : ''}`} onClick={() => toggle('life_default', !s.life_default)} />
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">End-of-Day Rules</div>
+          {RULES_META.map(rule => (
+            <div key={rule.id} className="setting-row">
+              <div>
+                <div className="setting-label">{rule.name}</div>
+                <div className="setting-desc">{rule.desc}</div>
+              </div>
+              <button className={`toggle${rules[rule.id] ? ' on' : ''}`} onClick={() => toggleRule(rule.id)} />
+            </div>
+          ))}
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-title">Account</div>
+          <div className="account-row">
+            <div className="account-label">EMAIL</div>
+            <div className="account-value">{user?.email}</div>
+          </div>
+          <div className="account-row">
+            <div className="account-label">PASSWORD</div>
+            <button className="hbtn" onClick={async () => {
+              try {
+                await db.auth.resetPasswordForEmail(user?.email);
+                alert('Password reset email sent.');
+              } catch(e) { alert(e.message); }
+            }}>Send Reset Email</button>
+          </div>
+          <div className="account-row">
+            <div className="account-label">SESSION</div>
+            <button className="danger-btn" onClick={() => db.auth.signOut()}>Sign Out</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RootView ──────────────────────────────────────────
+  function RootView({ onNavigate, viewMode, nodes }) {
+    const areas = [
+      { key: 'new_day', label: 'New Day', desc: 'Daily notes. Reset each night.' },
+      { key: 'context', label: 'Context', desc: 'Persistent notes. Never archived.' },
+      { key: 'journal', label: 'Journal', desc: 'Daily entries. Archived at midnight.' },
+      { key: 'archive', label: 'Archive', desc: 'Flat archive. Up to 10,000 rows.' },
+      { key: 'collabs', label: 'Collabs', desc: 'Collaborative projects.' },
+      { key: 'settings', label: 'Settings', desc: 'Theme, rules, account.' },
+    ];
+    if (viewMode === 'panel') {
+      return (
+        <div>
+          <div className="section-heading">Night_OS</div>
+          <div className="panel-grid">
+            {areas.map(a => {
+              const count = (a.key === 'new_day' || a.key === 'context') ? buildTree(nodes[a.key] || []).length : null;
+              return (
+                <div key={a.key} className="panel-card" onClick={() => onNavigate([a.key])}>
+                  <div className="card-top"><div className="card-name">{a.label}</div></div>
+                  <div className="card-sub">{a.desc}</div>
+                  {count !== null && <SlotBar filled={count} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div className="section-heading">Night_OS</div>
+        <div className="standard-list">
+          {areas.map(a => (
+            <div key={a.key} className="list-row" onClick={() => onNavigate([a.key])}>
+              <div className="list-row-name">{a.label}</div>
+              <div className="list-row-sub">{a.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── CollabsView ───────────────────────────────────────
+  function CollabsView({ userId, nodes, onReload }) {
+    const [pending, setPending] = React.useState([]);
+    const [sent, setSent] = React.useState([]);
+    const [loadingInvites, setLoadingInvites] = React.useState(true);
+    const [inviteEmail, setInviteEmail] = React.useState('');
+    const [inviteNodeId, setInviteNodeId] = React.useState('');
+    const [inviting, setInviting] = React.useState(false);
+    const [inviteMsg, setInviteMsg] = React.useState(null);
+    const [responding, setResponding] = React.useState(null);
+
+    const contextCategories = buildTree(nodes.context || []).filter(c => c.level === 'category');
+
+    async function loadInvites() {
+      try {
+        const [p, s] = await Promise.all([DB.getPendingInvites(), DB.getSentInvites(userId)]);
+        const myPending = p.filter(i => i.owner_id !== userId);
+        setPending(myPending);
+        setSent(s);
+      } catch(e) { console.warn('Collab load failed:', e); }
+      setLoadingInvites(false);
+    }
+
+    React.useEffect(() => {
+      if (!userId) return;
+      loadInvites();
+      const interval = setInterval(loadInvites, 15000);
+      return () => clearInterval(interval);
+    }, [userId]);
+
+    async function handleInvite(e) {
+      e.preventDefault();
+      if (!inviteEmail.trim()) { setInviteMsg({ type: 'error', text: 'Email is required.' }); return; }
+      if (!inviteNodeId) { setInviteMsg({ type: 'error', text: 'Select a project node to share.' }); return; }
+      setInviting(true); setInviteMsg(null);
+      try {
+        await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_email: inviteEmail.trim() });
+        setInviteMsg({ type: 'success', text: `Invite sent to ${inviteEmail.trim()}` });
+        setInviteEmail('');
+        loadInvites();
+      } catch(ex) { setInviteMsg({ type: 'error', text: ex.message || 'Failed to send invite.' }); }
+      finally { setInviting(false); }
+    }
+
+    async function handleRespond(invite, status) {
+      setResponding(invite.id);
+      try {
+        await DB.respondCollabInvite(invite.id, status, userId);
+        await loadInvites();
+        if (status === 'accepted') onReload('collabs');
+      } catch(e) { alert('Response failed: ' + e.message); }
+      finally { setResponding(null); }
+    }
+
+    return (
+      <div>
+        <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
+          collabs
+          {pending.length > 0 && <span className="badge">{pending.length}</span>}
+        </div>
+
+        {pending.length > 0 && (
+          <div className="collab-section">
+            <div className="collab-section-title">Pending Invites {pending.length > 0 && <span className="badge">{pending.length}</span>}</div>
+            {pending.map(invite => (
+              <div key={invite.id} className="pending-invite">
+                <div className="pending-invite-info">
+                  <div className="pending-invite-node">{invite.node?.name || 'Shared project'}</div>
+                  <div className="pending-invite-from">from {invite.owner_id === userId ? 'you' : invite.invitee_email || 'teammate'} · {new Date(invite.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="pending-invite-actions">
+                  <button className="hbtn" style={{borderColor:'var(--dot-green)',color:'var(--dot-green)'}} disabled={responding===invite.id} onClick={() => handleRespond(invite, 'accepted')}>Accept</button>
+                  <button className="hbtn" style={{borderColor:'var(--dot-red)',color:'var(--dot-red)'}} disabled={responding===invite.id} onClick={() => handleRespond(invite, 'declined')}>Decline</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="collab-section">
+          <div className="collab-section-title">Invite Teammate</div>
+          <div className="invite-form">
+            <form onSubmit={handleInvite}>
+              <div className="invite-form-row">
+                <div className="form-group">
+                  <label className="form-label">EMAIL</label>
+                  <input className="form-input" type="email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="teammate@example.com" />
+                </div>
+                <div className="form-group" style={{minWidth:140}}>
+                  <label className="form-label">PROJECT NODE</label>
+                  <select className="form-input" value={inviteNodeId} onChange={e=>setInviteNodeId(e.target.value)}>
+                    <option value="">Select...</option>
+                    {contextCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="hbtn" disabled={inviting} style={{alignSelf:'flex-end',padding:'8px 14px'}}>
+                  {inviting ? '...' : 'Invite'}
+                </button>
+              </div>
+              {inviteMsg && <div className={`form-msg ${inviteMsg.type}`} style={{marginTop:8}}>{inviteMsg.text}</div>}
+            </form>
+          </div>
+        </div>
+
+        <div className="collab-section">
+          <div className="collab-section-title">Sent Invites</div>
+          {loadingInvites ? <div className="loading">Loading...</div> : sent.length === 0
+            ? <div className="empty-hint" style={{padding:'20px 0'}}>No sent invites yet.</div>
+            : sent.map(invite => (
+              <div key={invite.id} className="sent-invite">
+                <div>
+                  <span style={{fontWeight:600,marginRight:8}}>{invite.node?.name || 'Unknown project'}</span>
+                  <span style={{opacity:0.5}}>→ {invite.invitee_email}</span>
+                </div>
+                <span className={`invite-status ${invite.status}`}>{invite.status}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    );
+  }
+
+  // ── CommandBar ────────────────────────────────────────
+  function CommandBar({ path, nodes, onNavigate }) {
+    const [input, setInput] = React.useState('');
+    const [suggestions, setSuggestions] = React.useState([]);
+    const [history, setHistory] = React.useState([]);
+    const [historyIndex, setHistoryIndex] = React.useState(-1);
+    const [selIdx, setSelIdx] = React.useState(-1);
+    const inputRef = React.useRef(null);
+    const prompt = path.length > 0 ? path.map(p => p.replace('_',' ')).join(' › ') + ' › ' : 'root › ';
+
+    React.useEffect(() => {
+      if (!input.trim()) { setSuggestions([]); return; }
+      const currentArea = path[0];
+      if (!currentArea || !['new_day','context','collabs'].includes(currentArea)) {
+        setSuggestions(['settings','new_day','context','journal','archive','collabs'].filter(n => n.startsWith(input.toLowerCase())));
+        return;
+      }
+      const tree = buildTree((nodes && nodes[currentArea]) || []);
+      const relPath = path.slice(1);
+      let children = relPath.length === 0 ? tree : (findNodeByPath(tree, relPath)?.children || []);
+      setSuggestions(children.map(n=>n.name).filter(n => n.toLowerCase().startsWith(input.toLowerCase())));
+      setSelIdx(-1);
+    }, [input, path, nodes]);
+
+    function pushHistory(cmd) { setHistory(prev => [cmd, ...prev.filter(h=>h!==cmd)].slice(0,10)); }
+    function parseAndNavigate(raw) {
+      const s = raw.trim(); if (!s) return;
+      pushHistory(s); setHistoryIndex(-1);
+      if (s === '..') { onNavigate(path.slice(0,-1)); return; }
+      if (s === '...' || s === '/') { onNavigate([]); return; }
+      if (s.includes('.')) { onNavigate(s.split('.').filter(Boolean)); return; }
+      onNavigate([...path, s]);
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        parseAndNavigate(selIdx >= 0 && suggestions[selIdx] ? suggestions[selIdx] : input);
+        setInput(''); setSuggestions([]); setSelIdx(-1);
+      } else if (e.key === 'Escape') {
+        if (input) { setInput(''); setSuggestions([]); } else onNavigate(path.slice(0,-1));
+      } else if (e.key === 'Backspace' && !input) {
+        onNavigate(path.slice(0,-1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (suggestions.length > 0 && input) setSelIdx(i => Math.max(0,i-1));
+        else if (!input) setHistoryIndex(i => { const n = Math.min(i+1,history.length-1); setInput(history[n]||''); return n; });
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (suggestions.length > 0 && input) setSelIdx(i => Math.min(suggestions.length-1,i+1));
+        else if (!input) setHistoryIndex(i => { const n = Math.max(i-1,-1); setInput(n<0?'':(history[n]||'')); return n; });
+      }
+    }
+
+    return (
+      <div className="command-bar">
+        {suggestions.length > 0 && (
+          <div className="cmd-suggestions">
+            {suggestions.map((s,i) => (
+              <div key={s} className={`cmd-suggestion${i===selIdx?' selected':''}`} onClick={() => { parseAndNavigate(s); setInput(''); setSuggestions([]); }}>{s}</div>
+            ))}
+          </div>
+        )}
+        <span className="cmd-prompt">{prompt}</span>
+        <input ref={inputRef} className="cmd-input" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="type to navigate..." autoComplete="off" spellCheck="false" />
+      </div>
+    );
+  }
+
+  // ── App ───────────────────────────────────────────────
+  function App() {
+    const { user, loading: authLoading } = useAuth();
+    const [path, setPath] = React.useState([]);
+    const [nodes, setNodes] = React.useState({ new_day: [], context: [], collabs: [] });
+    const [journalEntries, setJournalEntries] = React.useState([]);
+    const [settings, setSettings] = React.useState(DEFAULT_SETTINGS);
+    const [dataLoading, setDataLoading] = React.useState(false);
+    const [saveStatus, setSaveStatus] = React.useState('idle');
+    const [eodBanner, setEodBanner] = React.useState(null);
+
+    const settingsDirtyRef = React.useRef(false);
+    const saveTimerRef = React.useRef(null);
+    const nodesRef = React.useRef(nodes);
+    const journalRef = React.useRef(journalEntries);
+
+    React.useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+    React.useEffect(() => { journalRef.current = journalEntries; }, [journalEntries]);
+
+    // Theme
+    React.useEffect(() => {
+      document.documentElement.setAttribute('data-theme', settings.theme || 'night');
+    }, [settings.theme]);
+
+    // Settings auto-save debounce
+    React.useEffect(() => {
+      if (!user || !settingsDirtyRef.current) return;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      setSaveStatus('saving');
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          await DB.upsertSettings(user.id, settings);
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2500);
+        } catch(e) { setSaveStatus('idle'); }
+      }, 700);
+    }, [settings]);
+
+    function handleSettingsChange(newSettings) {
+      settingsDirtyRef.current = true;
+      setSettings(newSettings);
+    }
+
+    // Load all data
+    React.useEffect(() => {
+      if (!user) { setNodes({ new_day:[], context:[], collabs:[] }); setJournalEntries([]); setSettings(DEFAULT_SETTINGS); return; }
+      setDataLoading(true);
+      Promise.allSettled([
+        DB.getNodes(user.id, 'new_day'),
+        DB.getNodes(user.id, 'context'),
+        DB.getNodes(user.id, 'collabs'),
+        DB.getTodayJournal(user.id),
+        DB.getSettings(user.id),
+      ]).then(async ([ndRes, ctxRes, collRes, jRes, setRes]) => {
+        const nd = ndRes.status === 'fulfilled' ? ndRes.value : [];
+        const ctx = ctxRes.status === 'fulfilled' ? ctxRes.value : [];
+        const coll = collRes.status === 'fulfilled' ? collRes.value : [];
+        const j = jRes.status === 'fulfilled' ? jRes.value : [];
+        const sett = setRes.status === 'fulfilled' ? setRes.value : null;
+        setNodes({ new_day: nd, context: ctx, collabs: coll });
+        setJournalEntries(j);
+        if (sett) {
+          setSettings({ theme: sett.theme||'night', view_mode: sett.view_mode||'panel', life_default: sett.life_default!==false, rules: { ...DEFAULT_SETTINGS.rules, ...(sett.rules||{}) } });
+        } else {
+          try { await DB.upsertSettings(user.id, DEFAULT_SETTINGS); } catch(e) {}
+        }
+        if (nd.length === 0 && ctx.length === 0) {
+          try {
+            await seedLifeForUser(user.id);
+            const [ndNew, ctxNew] = await Promise.all([DB.getNodes(user.id,'new_day'), DB.getNodes(user.id,'context')]);
+            setNodes(prev => ({ ...prev, new_day: ndNew, context: ctxNew }));
+          } catch(e) { console.warn('Seed failed:', e); }
+        }
+        setDataLoading(false);
+      });
+    }, [user]);
+
+    function navigate(segs) { setPath(segs); }
+
+    async function reloadNodes(area) {
+      if (!user) return;
+      try { const fresh = await DB.getNodes(user.id, area); setNodes(prev => ({ ...prev, [area]: fresh })); }
+      catch(e) { console.warn('Reload failed:', e); }
+    }
+
+    async function reloadJournal() {
+      if (!user) return;
+      try { setJournalEntries(await DB.getTodayJournal(user.id)); }
+      catch(e) {}
+    }
+
+    // EOD timer
+    useEODTimer(
+      user?.id,
+      () => setEodBanner({ type: 'warn', msg: '30 minutes until end of day. New_day will be processed at 11:59:59 PM.' }),
+      async () => {
+        const result = await runEODProcessing(user.id, settings.rules, nodesRef.current, journalRef.current);
+        if (result && !result.skipped) {
+          await Promise.all([reloadNodes('new_day'), reloadNodes('context'), reloadJournal()]);
+          setEodBanner({ type: 'done', msg: `End of day complete: ${result.merged} merged, ${result.archived} archived.` });
+        }
+      }
+    );
+
+    if (authLoading) return (
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'var(--accent)'}}>Night_OS loading...</div>
+    );
+    if (!user) return <AuthModal />;
+
+    function renderContent() {
+      if (dataLoading) return <div className="loading">Loading workspace...</div>;
+      const area = path[0];
+      if (!area) return <RootView onNavigate={navigate} viewMode={settings.view_mode} nodes={nodes} />;
+      if (area === 'settings') return <SettingsView settings={settings} onSettingsChange={handleSettingsChange} saveStatus={saveStatus} user={user} />;
+      if (area === 'new_day' || area === 'context') return (
+        <WorkspaceView area={area} path={path} nodes={nodes} contextNodes={nodes.context} viewMode={settings.view_mode} onNavigate={navigate} onReload={reloadNodes} userId={user.id} />
+      );
+      if (area === 'journal') return <JournalView journalEntries={journalEntries} userId={user.id} onReload={reloadJournal} />;
+      if (area === 'archive') return <ArchiveView userId={user.id} onReload={reloadNodes} />;
+      if (area === 'collabs') return <CollabsView userId={user.id} nodes={nodes} onReload={reloadNodes} />;
+      return <div className="empty-hint">Unknown area: {area}</div>;
+    }
+
+    return (
+      <div className="app">
+        <Header path={path} onNavigate={navigate} user={user} settings={settings} onSettingsChange={handleSettingsChange} />
+        <MapModule path={path} nodes={nodes} onNavigate={navigate} />
+        <div className="main">{renderContent()}</div>
+        {eodBanner && (
+          <div className={`eod-banner ${eodBanner.type}`}>
+            <div className="eod-banner-text">
+              {eodBanner.type === 'warn' ? '⚠' : '✓'} {eodBanner.msg}
+            </div>
+            <button className="eod-banner-dismiss" onClick={() => setEodBanner(null)}>Dismiss</button>
+          </div>
+        )}
+        <CommandBar path={path} nodes={nodes} onNavigate={navigate} />
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
