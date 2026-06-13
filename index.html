@@ -182,10 +182,7 @@
     .sent-invite { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
     .invite-status { font-size: 10px; padding: 2px 7px; border-radius: 3px; border: 1px solid currentColor; }
     .invite-status.pending { color: var(--accent); opacity: 0.7; }
-    .node-self-header { display: flex; align-items: flex-start; gap: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
-    .node-self-name { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 4px; }
-    .node-self-content { font-size: 13px; opacity: 0.65; white-space: pre-wrap; }
-    .invite-link-panel { background: var(--bg2); border: 1px solid var(--dot-green); border-radius: 8px; padding: 14px 16px; margin-top: 10px; }
+.invite-link-panel { background: var(--bg2); border: 1px solid var(--dot-green); border-radius: 8px; padding: 14px 16px; margin-top: 10px; }
     .invite-link-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; margin-bottom: 8px; }
     .invite-link-row { display: flex; gap: 8px; align-items: center; }
     .invite-link-hint { font-size: 11px; opacity: 0.45; margin-top: 6px; }
@@ -1051,13 +1048,6 @@
       if (!parentNode) return <div className="empty-hint">Navigate to a detail to see fragments.</div>;
       return (
         <div>
-          <div className="node-self-header">
-            <div style={{flex:1}}>
-              <div className="node-self-name">{parentNode.name}</div>
-              {parentNode.content && <div className="node-self-content">{parentNode.content}</div>}
-            </div>
-            <button className="hbtn" onClick={() => setEditModal(parentNode)}>✎ Edit</button>
-          </div>
           <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
             {area} · {relPath.join(' › ')}
             <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
@@ -1133,15 +1123,6 @@
         {deleteModal && <DeleteNodeConfirm node={deleteModal} onClose={() => setDeleteModal(null)} onDeleted={() => { setDeleteModal(null); onReload(area); }} />}
         {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
         {addModal && <AddNodeModal area={area} parentId={addParentId} level={addLevel} siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
-        {parentNode && (
-          <div className="node-self-header">
-            <div style={{flex:1}}>
-              <div className="node-self-name">{parentNode.name}</div>
-              {parentNode.content && <div className="node-self-content">{parentNode.content}</div>}
-            </div>
-            <button className="hbtn" onClick={() => setEditModal(parentNode)}>✎ Edit</button>
-          </div>
-        )}
         <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
           {heading}
           <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
