@@ -212,6 +212,10 @@
     .swap-btn.pending { opacity: 1; border-color: var(--accent); color: var(--accent); }
     .panel-card.swap-pending { outline: 1px solid var(--accent); }
     .list-row.swap-pending { border-left: 2px solid var(--accent); }
+    .panel-card[draggable] { cursor: grab; }
+    .panel-card.drag-over { outline: 1px dashed var(--accent); opacity: 0.7; }
+    .list-row[draggable] { cursor: grab; }
+    .list-row.drag-over { border-left: 2px dashed var(--accent); opacity: 0.7; }
     .eod-top-n-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
     .eod-top-n-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 4px 8px; border-radius: 4px; width: 52px; text-align: center; }
   </style>
@@ -1086,6 +1090,8 @@
     const [deleteModal, setDeleteModal] = React.useState(null);
     const [swapFirst, setSwapFirst] = React.useState(null);
     const [focusedId, setFocusedId] = React.useState(null);
+    const [dragOverId, setDragOverId] = React.useState(null);
+    const dragIdRef = React.useRef(null);
 
     const relPath = path.slice(1);
     const areaNodes = nodes[area] || [];
@@ -1116,6 +1122,23 @@
         await DB.swapSortOrders(node.id, other.sort_order, other.id, node.sort_order);
         onReload(area);
       } catch(e) { console.error('moveNode failed:', e); }
+    }
+
+    function handleDragStart(e, node) {
+      dragIdRef.current = node.id;
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDrop(e, node) {
+      e.preventDefault();
+      setDragOverId(null);
+      if (!dragIdRef.current || dragIdRef.current === node.id) return;
+      const dragNode = currentItemsRef.current.find(n => n.id === dragIdRef.current);
+      if (!dragNode) return;
+      dragIdRef.current = null;
+      DB.swapSortOrders(dragNode.id, node.sort_order, node.id, dragNode.sort_order)
+        .then(() => onReload(area))
+        .catch(e => console.error(e));
     }
 
     function handleSwap(node) {
@@ -1222,8 +1245,9 @@
 
       if (viewMode === 'panel') {
         return (
-          <div key={node.id} className={`panel-card${isSwapPending?' swap-pending':''}${isFocused?' focused':''}`}
-            onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}>
+          <div key={node.id} className={`panel-card${isSwapPending?' swap-pending':''}${isFocused?' focused':''}${dragOverId===node.id?' drag-over':''}`}
+            onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
+            draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
             <div className="card-top">
               {dot && <div className={`dot dot-${dot}`} title={dot} />}
               <span className="card-name">{node.name}</span>
@@ -1244,8 +1268,9 @@
         );
       }
       return (
-        <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}`}
-          onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}>
+        <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}${dragOverId===node.id?' drag-over':''}`}
+          onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
+          draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
           {dot && <div className={`dot dot-${dot}`} title={dot} />}
           <span className="rank-badge">#{rank}</span>
           <span className="list-row-name">{node.name}</span>
