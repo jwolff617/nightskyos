@@ -1367,16 +1367,23 @@
     const [inviteMsg, setInviteMsg] = React.useState(null);
     const [responding, setResponding] = React.useState(null);
 
-    function flattenContext(nodeList, path = []) {
-      const result = [];
-      for (const node of nodeList) {
-        const fullPath = [...path, node.name];
-        result.push({ id: node.id, label: fullPath.join(' › '), depth: path.length });
-        if (node.children && node.children.length > 0) result.push(...flattenContext(node.children, fullPath));
+    function getProjectNodes(nodesArr, area) {
+      const results = [];
+      function walk(nodeList, inProjects, path) {
+        for (const node of nodeList) {
+          const p = [...path, node.name];
+          const entering = inProjects || node.name === 'projects';
+          if (entering && node.name !== 'projects') results.push({ id: node.id, label: p.join(' › '), area });
+          if (node.children && node.children.length > 0) walk(node.children, entering, p);
+        }
       }
-      return result;
+      walk(buildTree(nodesArr), false, []);
+      return results;
     }
-    const contextNodes = flattenContext(buildTree(nodes.context || []));
+    const projectNodes = [
+      ...getProjectNodes(nodes.new_day || [], 'new_day'),
+      ...getProjectNodes(nodes.context || [], 'context'),
+    ];
 
     async function loadInvites() {
       try {
@@ -1456,8 +1463,8 @@
                 <div className="form-group" style={{minWidth:140}}>
                   <label className="form-label">PROJECT NODE</label>
                   <select className="form-input" value={inviteNodeId} onChange={e=>setInviteNodeId(e.target.value)}>
-                    <option value="">Select a node...</option>
-                    {contextNodes.map(n => <option key={n.id} value={n.id}>{'  '.repeat(n.depth)}{n.label}</option>)}
+                    <option value="">Select a project...</option>
+                    {projectNodes.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
                   </select>
                 </div>
                 <button type="submit" className="hbtn" disabled={inviting} style={{alignSelf:'flex-end',padding:'8px 14px'}}>
