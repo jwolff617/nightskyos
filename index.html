@@ -547,20 +547,25 @@
   }
 
   async function reseedNewDayLife(userId) {
-    const existing = await DB.getNodes(userId, 'new_day');
-    if (buildTree(existing).some(c => c.name === 'life')) return;
-    await seedAreaLife(userId, 'new_day');
-    // Seed one daily quote and gratitude fragment
-    const fresh = await DB.getNodes(userId, 'new_day');
-    const tree = buildTree(fresh);
+    let existing = await DB.getNodes(userId, 'new_day');
+    // Create life structure if missing
+    if (!buildTree(existing).some(c => c.name === 'life')) {
+      await seedAreaLife(userId, 'new_day');
+      existing = await DB.getNodes(userId, 'new_day');
+    }
+    // Always seed today's quote + gratitude if those slots are empty
+    const tree = buildTree(existing);
     const todayNote = findNodeByPath(tree, ['life', 'today']);
-    if (todayNote) {
-      const quotesDetail = (todayNote.children || []).find(n => n.name === 'quotes');
-      const gratDetail = (todayNote.children || []).find(n => n.name === 'gratitudes');
+    if (!todayNote) return;
+    const quotesDetail = (todayNote.children || []).find(n => n.name === 'quotes');
+    const gratDetail = (todayNote.children || []).find(n => n.name === 'gratitudes');
+    if (quotesDetail && (quotesDetail.children || []).length === 0) {
       const q = SEED_QUOTES[dailyIndex(SEED_QUOTES, 1)];
+      await DB.createNode({ user_id: userId, area: 'new_day', parent_id: quotesDetail.id, level: 'fragment', name: `"${q.t}" — ${q.a}`, content: '', sort_order: 0 });
+    }
+    if (gratDetail && (gratDetail.children || []).length === 0) {
       const g = SEED_GRAT[dailyIndex(SEED_GRAT, 2)];
-      if (quotesDetail) await DB.createNode({ user_id: userId, area: 'new_day', parent_id: quotesDetail.id, level: 'fragment', name: `"${q.t}" — ${q.a}`, content: '', sort_order: 0 });
-      if (gratDetail) await DB.createNode({ user_id: userId, area: 'new_day', parent_id: gratDetail.id, level: 'fragment', name: g, content: '', sort_order: 0 });
+      await DB.createNode({ user_id: userId, area: 'new_day', parent_id: gratDetail.id, level: 'fragment', name: g, content: '', sort_order: 0 });
     }
   }
 
@@ -2176,6 +2181,12 @@
             setNodes(prev => ({ ...prev, new_day: ndNew, context: ctxNew }));
           } catch(e) { console.error('Seed failed:', e); }
         }
+        // Seed today's quote + gratitude on every login if slots are empty
+        try {
+          await reseedNewDayLife(user.id);
+          const ndFresh = await DB.getNodes(user.id, 'new_day');
+          setNodes(prev => ({ ...prev, new_day: ndFresh }));
+        } catch(e) {}
         setDataLoading(false);
       });
     }, [user]);
