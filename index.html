@@ -73,6 +73,7 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .dot-red { background: var(--dot-red); }
     .dot-green { background: var(--dot-green); }
+    .dot-green-new { background: radial-gradient(circle, var(--bg) 35%, var(--dot-green) 35%); border: 1px solid var(--dot-green); }
     .dot-purple { background: var(--dot-purple); }
 
     /* Icon buttons */
@@ -563,11 +564,12 @@
 
   function computeDot(node, pathFromCategory, contextTree) {
     if (pathFromCategory[1] === 'journal' || pathFromCategory[0] === 'journal') return 'purple';
-    // Check alignment at note level (depth 2) max — details/fragments inherit from ancestor match.
-    // A node is green if its path OR any ancestor path up to depth 2 exists in context.
-    const checkDepth = Math.min(pathFromCategory.length, 2);
-    for (let d = checkDepth; d >= 1; d--) {
-      if (findNodeByPath(contextTree, pathFromCategory.slice(0, d))) return 'green';
+    // Exact path match → solid green: will merge INTO an existing context node
+    if (findNodeByPath(contextTree, pathFromCategory)) return 'green';
+    // Ancestor match (up to note level, depth 2) → hollow green: parent aligned, this node will be created/merged to parent
+    const maxAncestor = Math.min(pathFromCategory.length - 1, 2);
+    for (let d = maxAncestor; d >= 1; d--) {
+      if (findNodeByPath(contextTree, pathFromCategory.slice(0, d))) return 'green-new';
     }
     return 'red';
   }
@@ -1216,7 +1218,7 @@
             return (
               <div key={node.id} className="fragment-card" onClick={() => setEditModal(node)}>
                 <div className="fragment-card-header">
-                  {dot && <div className={`dot dot-${dot}`} title={dot} />}
+                  {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
                   <span className="fragment-card-name">{node.name}</span>
                   <span className="rank-badge">#{idx + 1}</span>
                   <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
@@ -1249,7 +1251,7 @@
             onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
             draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
             <div className="card-top">
-              {dot && <div className={`dot dot-${dot}`} title={dot} />}
+              {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
               <span className="card-name">{node.name}</span>
               <div className="card-actions">
                 <span className="rank-badge">#{rank}</span>
@@ -1271,7 +1273,7 @@
         <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}${dragOverId===node.id?' drag-over':''}`}
           onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
           draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
-          {dot && <div className={`dot dot-${dot}`} title={dot} />}
+          {dot && <div className={`dot dot-${dot}`} title={dot==='green'?'Merges into existing context node':dot==='green-new'?'Parent aligned — will merge to parent context node':dot==='purple'?'Journal — archived at EOD':'No context match — archived at EOD'} />}
           <span className="rank-badge">#{rank}</span>
           <span className="list-row-name">{node.name}</span>
           {node.content && <span className="list-row-content">{node.content}</span>}
