@@ -488,6 +488,7 @@
     theme: 'night',
     view_mode: 'panel',
     life_default: true,
+    sync_seed_to_context: false,
     rules: {
       notify_before_eod: true,
       auto_append_matched: true,
@@ -544,6 +545,32 @@
   async function seedLifeForUser(userId) {
     for (const area of ['new_day', 'context']) await seedAreaLife(userId, area);
     await reseedNewDayLife(userId); // seeds daily quote + gratitude (no-op if life already exists)
+  }
+
+  async function syncSeedToContext(userId) {
+    let existing = await DB.getNodes(userId, 'context');
+    let ctxTree = buildTree(existing);
+    let lifeCat = ctxTree.find(n => n.name === 'life');
+    if (!lifeCat) {
+      const data = await DB.createNode({ user_id: userId, area: 'context', parent_id: null, level: 'category', name: 'life', content: '', sort_order: 0 });
+      lifeCat = { ...data, children: [] };
+    }
+    for (let ni = 0; ni < LIFE_SEED.length; ni++) {
+      const { note, details } = LIFE_SEED[ni];
+      let noteNode = (lifeCat.children || []).find(n => n.name === note);
+      if (!noteNode) {
+        const data = await DB.createNode({ user_id: userId, area: 'context', parent_id: lifeCat.id, level: 'note', name: note, content: '', sort_order: ni });
+        noteNode = { ...data, children: [] };
+        lifeCat.children = [...(lifeCat.children || []), noteNode];
+      }
+      for (let di = 0; di < details.length; di++) {
+        const det = details[di];
+        if (!(noteNode.children || []).find(n => n.name === det)) {
+          const data = await DB.createNode({ user_id: userId, area: 'context', parent_id: noteNode.id, level: 'detail', name: det, content: '', sort_order: di });
+          noteNode.children = [...(noteNode.children || []), { ...data, children: [] }];
+        }
+      }
+    }
   }
 
   async function reseedNewDayLife(userId) {
@@ -1645,6 +1672,10 @@
             <div><div className="setting-label">Life Default</div><div className="setting-desc">Seed life structure on first login</div></div>
             <button className={`toggle${s.life_default ? ' on' : ''}`} onClick={() => toggle('life_default', !s.life_default)} />
           </div>
+          <div className="setting-row">
+            <div><div className="setting-label">Match Seed to Context</div><div className="setting-desc">Ensures all pre-loaded new_day paths also exist in context so seeded notes show green</div></div>
+            <button className={`toggle${s.sync_seed_to_context ? ' on' : ''}`} onClick={() => toggle('sync_seed_to_context', !s.sync_seed_to_context)} />
+          </div>
         </div>
 
         <div className="settings-section">
@@ -2145,6 +2176,10 @@
     function handleSettingsChange(newSettings) {
       settingsDirtyRef.current = true;
       setSettings(newSettings);
+      // When sync_seed_to_context is turned on, run immediately
+      if (newSettings.sync_seed_to_context && !settings.sync_seed_to_context && user) {
+        syncSeedToContext(user.id).then(() => reloadNodes('context')).catch(e => console.error(e));
+      }
     }
 
     // Load all data
@@ -2186,6 +2221,15 @@
           await reseedNewDayLife(user.id);
           const ndFresh = await DB.getNodes(user.id, 'new_day');
           setNodes(prev => ({ ...prev, new_day: ndFresh }));
+        } catch(e) {}
+        // Sync seed structure to context if setting is on
+        try {
+          const s = await DB.getSettings(user.id);
+          if (s && s.sync_seed_to_context) {
+            await syncSeedToContext(user.id);
+            const ctxFresh = await DB.getNodes(user.id, 'context');
+            setNodes(prev => ({ ...prev, context: ctxFresh }));
+          }
         } catch(e) {}
         setDataLoading(false);
       });
