@@ -226,6 +226,16 @@
     .map-box.drop-valid { outline: 1px solid var(--dot-green); background: rgba(85,168,85,0.15); }
     .map-box.drop-invalid { outline: 1px solid var(--dot-red); }
     .map-drop-error { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); background: var(--dot-red); color: #fff; font-size: 12px; padding: 8px 16px; border-radius: 6px; z-index: 999; pointer-events: none; }
+    .send-to-btn { background: none; border: 1px solid var(--accent); color: var(--accent); font-family: inherit; font-size: 10px; padding: 2px 5px; border-radius: 3px; cursor: pointer; opacity: 0.7; white-space: nowrap; }
+    .send-to-btn:hover { opacity: 1; background: var(--accent); color: var(--bg); }
+    .send-to-modal { max-width: 400px; width: 90%; max-height: 75vh; display: flex; flex-direction: column; }
+    .send-to-list { flex: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin: 8px 0; min-height: 80px; }
+    .send-to-item { display: flex; align-items: center; padding: 7px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid var(--border); user-select: none; }
+    .send-to-item:last-child { border-bottom: none; }
+    .send-to-item.active { background: var(--accent); color: var(--bg); }
+    .send-to-item.invalid { opacity: 0.28; cursor: not-allowed; }
+    .send-to-item-level { font-size: 9px; opacity: 0.5; margin-left: auto; text-transform: uppercase; letter-spacing: 0.5px; }
+    .send-to-item.active .send-to-item-level { opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -475,6 +485,11 @@
     },
     async deleteArchiveRows(ids) {
       const { error } = await db.from('archive_rows').delete().in('id', ids);
+      if (error) throw error;
+    },
+    async setNodesArea(ids, newArea) {
+      if (!ids || ids.length === 0) return;
+      const { error } = await db.from('nodes').update({ area: newArea }).in('id', ids);
       if (error) throw error;
     },
   };
@@ -1003,6 +1018,123 @@
     );
   }
 
+  // ── SendToModal ───────────────────────────────────────
+  function SendToModal({ node, contextNodes, onClose, onMoved }) {
+    const ctxTree = buildTree(contextNodes);
+
+    function flattenCtx(treeNodes, depth) {
+      const result = [];
+      for (const n of treeNodes) {
+        const isFull = (n.children || []).length >= 10;
+        const isValid = LEVEL_ACCEPTS[n.level] === node.level && !isFull;
+        result.push({ node: n, depth, isValid });
+        result.push(...flattenCtx(n.children || [], depth + 1));
+      }
+      return result;
+    }
+
+    const rootValid = node.level === 'category' && ctxTree.length < 10;
+    const allItems = [
+      ...(rootValid ? [{ node: null, depth: 0, isValid: true }] : []),
+      ...flattenCtx(ctxTree, 0),
+    ];
+
+    const [activeIdx, setActiveIdx] = React.useState(() => {
+      const first = allItems.findIndex(it => it.isValid);
+      return first >= 0 ? first : 0;
+    });
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState('');
+    const activeRef = React.useRef(null);
+
+    React.useEffect(() => {
+      if (activeRef.current) activeRef.current.scrollIntoView({ block: 'nearest' });
+    }, [activeIdx]);
+
+    React.useEffect(() => {
+      function onKey(e) {
+        if (e.key === 'Escape') { onClose(); return; }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setActiveIdx(i => {
+            let next = i + 1;
+            while (next < allItems.length && !allItems[next].isValid) next++;
+            return next < allItems.length ? next : i;
+          });
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActiveIdx(i => {
+            let prev = i - 1;
+            while (prev >= 0 && !allItems[prev].isValid) prev--;
+            return prev >= 0 ? prev : i;
+          });
+        }
+        if (e.key === 'Enter') {
+          const target = allItems[activeIdx];
+          if (target && target.isValid) doMove(target);
+        }
+      }
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [activeIdx]);
+
+    async function doMove(target) {
+      setBusy(true); setErr('');
+      try {
+        const newParentId = target.node ? target.node.id : null;
+        const siblings = target.node ? (target.node.children || []).length : ctxTree.length;
+        function collectDescendantIds(n) {
+          const ids = [];
+          for (const c of (n.children || [])) { ids.push(c.id); ids.push(...collectDescendantIds(c)); }
+          return ids;
+        }
+        await DB.reparentNode(node.id, newParentId, 'context', siblings);
+        const descIds = collectDescendantIds(node);
+        if (descIds.length > 0) await DB.setNodesArea(descIds, 'context');
+        onMoved();
+      } catch(ex) {
+        setErr(ex.message || 'Move failed.');
+        setBusy(false);
+      }
+    }
+
+    const activeTarget = allItems[activeIdx];
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal send-to-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-title">Send To</div>
+          <div style={{fontSize:11,opacity:0.55,marginBottom:2}}>Moving: <strong>{node.name}</strong> <span style={{opacity:0.5}}>({node.level})</span></div>
+          <div style={{fontSize:10,opacity:0.4,marginBottom:6}}>↑ ↓ navigate · Enter confirm · Esc cancel</div>
+          {allItems.length === 0
+            ? <div style={{fontSize:12,opacity:0.5,padding:'16px 0'}}>No valid destinations in context for this level.</div>
+            : <div className="send-to-list">
+                {allItems.map((item, idx) => (
+                  <div key={item.node ? item.node.id : '__root'}
+                    ref={idx === activeIdx ? activeRef : null}
+                    className={`send-to-item${idx === activeIdx ? ' active' : ''}${!item.isValid ? ' invalid' : ''}`}
+                    style={{ paddingLeft: (10 + item.depth * 16) + 'px' }}
+                    title={!item.isValid ? ((item.node && (item.node.children||[]).length >= 10) ? 'Full (10/10 children)' : 'Wrong level') : ''}
+                    onClick={() => { if (!item.isValid) return; if (idx === activeIdx) doMove(item); else setActiveIdx(idx); }}>
+                    {item.node ? item.node.name : 'context (root)'}
+                    <span className="send-to-item-level">{item.node ? item.node.level : 'root'}</span>
+                  </div>
+                ))}
+              </div>
+          }
+          {err && <div className="form-msg error" style={{marginBottom:8}}>{err}</div>}
+          <div style={{display:'flex',gap:8,marginTop:4}}>
+            <button className="form-btn" disabled={busy || !activeTarget?.isValid} onClick={() => activeTarget && doMove(activeTarget)} style={{flex:1}}>
+              {busy ? 'Moving...' : 'Move Here'}
+            </button>
+            <button className="hbtn" onClick={onClose} style={{padding:'8px 16px'}}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── AddNodeModal ──────────────────────────────────────
   function AddNodeModal({ area, parentId, level, siblingCount, userId, onClose, onSaved }) {
     const [name, setName] = React.useState('');
@@ -1227,6 +1359,7 @@
     const [swapFirst, setSwapFirst] = React.useState(null);
     const [focusedId, setFocusedId] = React.useState(null);
     const [dragOverId, setDragOverId] = React.useState(null);
+    const [sendToModal, setSendToModal] = React.useState(null);
     const dragIdRef = React.useRef(null);
 
     const relPath = path.slice(1);
@@ -1397,6 +1530,7 @@
               <span className="card-name">{node.name}</span>
               <div className="card-actions">
                 {showCtxBtn && <button className="ctx-btn" onClick={e=>{e.stopPropagation();createContextPath(nodePath);}} title="Create matching path in context">→ ctx</button>}
+                {area === 'new_day' && <button className="send-to-btn" onClick={e=>{e.stopPropagation();setSendToModal(node);}} title="Send to a parent in context">→ send</button>}
                 <span className="rank-badge">#{rank}</span>
                 <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
                 <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down">↓</button>
@@ -1423,6 +1557,7 @@
           {node.level !== 'fragment' && <span className="list-row-sub">{childCount}/10</span>}
           <div className="list-row-actions">
             {showCtxBtn && <button className="ctx-btn" onClick={e=>{e.stopPropagation();createContextPath(nodePath);}} title="Create matching path in context">→ ctx</button>}
+            {area === 'new_day' && <button className="send-to-btn" onClick={e=>{e.stopPropagation();setSendToModal(node);}} title="Send to a parent in context">→ send</button>}
             <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'up');}} title="Move up">↑</button>
             <button className="move-btn" onClick={e=>{e.stopPropagation();moveNode(node,'down');}} title="Move down">↓</button>
             <button className={`swap-btn${isSwapPending?' pending':''}`}
@@ -1443,6 +1578,7 @@
         {deleteModal && <DeleteNodeConfirm node={deleteModal} onClose={() => setDeleteModal(null)} onDeleted={() => { setDeleteModal(null); onReload(area); }} />}
         {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
         {addModal && <AddNodeModal area={area} parentId={addParentId} level={addLevel} siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
+        {sendToModal && <SendToModal node={sendToModal} contextNodes={contextNodes || []} onClose={() => setSendToModal(null)} onMoved={() => { setSendToModal(null); onReload('new_day'); onReload('context'); }} />}
         <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
           {heading}
           <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
