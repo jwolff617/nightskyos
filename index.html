@@ -226,6 +226,7 @@
     .map-box.drop-valid { outline: 1px solid var(--dot-green); background: rgba(85,168,85,0.15); }
     .map-box.drop-invalid { outline: 1px solid var(--dot-red); }
     .map-drop-error { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); background: var(--dot-red); color: #fff; font-size: 12px; padding: 8px 16px; border-radius: 6px; z-index: 999; pointer-events: none; }
+    .gesture-hint { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--bg2); border: 1px solid var(--accent); color: var(--accent); font-size: 13px; font-weight: 600; padding: 10px 22px; border-radius: 8px; z-index: 9999; pointer-events: none; letter-spacing: 0.5px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
     .send-to-btn { background: none; border: 1px solid var(--accent); color: var(--accent); font-family: inherit; font-size: 10px; padding: 2px 5px; border-radius: 3px; cursor: pointer; opacity: 0.7; white-space: nowrap; }
     .send-to-btn:hover { opacity: 1; background: var(--accent); color: var(--bg); }
     .send-to-modal { max-width: 400px; width: 90%; max-height: 75vh; display: flex; flex-direction: column; }
@@ -533,6 +534,9 @@
 
   const LEVELS = ['category','note','detail','fragment'];
   function nextLevel(level) { return LEVELS[LEVELS.indexOf(level)+1] || null; }
+  function levelDown(level) { const i = LEVELS.indexOf(level); return i >= 0 && i < LEVELS.length - 1 ? LEVELS[i+1] : null; }
+  function levelUp(level) { const i = LEVELS.indexOf(level); return i > 0 ? LEVELS[i-1] : null; }
+  function allDescendants(node) { const r = []; for (const c of (node.children||[])) { r.push(c); r.push(...allDescendants(c)); } return r; }
   function levelLabel(level) { return level || 'item'; }
 
   const LIFE_SEED = [
@@ -1360,7 +1364,12 @@
     const [focusedId, setFocusedId] = React.useState(null);
     const [dragOverId, setDragOverId] = React.useState(null);
     const [sendToModal, setSendToModal] = React.useState(null);
+    const [gestureHint, setGestureHint] = React.useState(null);
     const dragIdRef = React.useRef(null);
+    const dragStartXRef = React.useRef(0);
+    const dragStartTimeRef = React.useRef(0);
+    const gestureNodeRef = React.useRef(null);
+    const gestureCommittedRef = React.useRef(null);
 
     const relPath = path.slice(1);
     const areaNodes = nodes[area] || [];
@@ -1395,17 +1404,90 @@
 
     function handleDragStart(e, node) {
       dragIdRef.current = node.id;
+      dragStartXRef.current = e.clientX;
+      dragStartTimeRef.current = Date.now();
+      gestureNodeRef.current = node;
+      gestureCommittedRef.current = null;
       window.__nightos_dragNode = { id: node.id, level: node.level, area, name: node.name };
       e.dataTransfer.effectAllowed = 'move';
     }
 
-    function handleDragEnd() {
+    function handleDragMove(e, node) {
+      if (!e.clientX || dragIdRef.current !== node.id) return;
+      const dx = e.clientX - dragStartXRef.current;
+      const elapsed = Date.now() - dragStartTimeRef.current;
+      if (Math.abs(dx) > 90 && elapsed > 900) {
+        const dir = dx < 0 ? 'outdent' : 'indent';
+        if (gestureCommittedRef.current !== dir) {
+          gestureCommittedRef.current = dir;
+          setGestureHint(dir);
+        }
+      } else if (Math.abs(dx) < 30 && gestureCommittedRef.current) {
+        gestureCommittedRef.current = null;
+        setGestureHint(null);
+      }
+    }
+
+    function handleDragEnd(e) {
+      const gesture = gestureCommittedRef.current;
+      const gNode = gestureNodeRef.current;
+      dragIdRef.current = null;
+      gestureCommittedRef.current = null;
+      gestureNodeRef.current = null;
+      setGestureHint(null);
+      setDragOverId(null);
       window.__nightos_dragNode = null;
+      if (gesture && gNode) {
+        if (gesture === 'indent') doIndent(gNode);
+        else doOutdent(gNode);
+      }
+    }
+
+    async function doIndent(node) {
+      if (node.level === 'fragment') return;
+      const idx = currentItemsRef.current.findIndex(n => n.id === node.id);
+      if (idx <= 0) return;
+      const siblingAbove = currentItemsRef.current[idx - 1];
+      const descs = allDescendants(node);
+      if (descs.some(d => d.level === 'fragment')) return; // deepest level, can't go further
+      const newLevel = levelDown(node.level);
+      const newSortOrder = (siblingAbove.children || []).length;
+      try {
+        await DB.reparentNode(node.id, siblingAbove.id, area, newSortOrder);
+        await DB.updateNode(node.id, { level: newLevel });
+        await Promise.all(descs.map(d => {
+          const dl = levelDown(d.level);
+          return dl ? DB.updateNode(d.id, { level: dl }) : Promise.resolve();
+        }));
+        onReload(area);
+      } catch(ex) { console.error('indent failed:', ex); }
+    }
+
+    async function doOutdent(node) {
+      if (node.level === 'category') return;
+      const newLevel = levelUp(node.level);
+      const newParentId = parentNode ? parentNode.parent_id : null;
+      const gpChildren = relPath.length <= 1 ? tree : (() => {
+        const gp = findNodeByPath(tree, relPath.slice(0, -1));
+        return gp ? (gp.children || []) : [];
+      })();
+      const newSortOrder = gpChildren.length;
+      const descs = allDescendants(node);
+      try {
+        await DB.reparentNode(node.id, newParentId || null, area, newSortOrder);
+        await DB.updateNode(node.id, { level: newLevel });
+        await Promise.all(descs.map(d => {
+          const ul = levelUp(d.level);
+          return ul ? DB.updateNode(d.id, { level: ul }) : Promise.resolve();
+        }));
+        onReload(area);
+      } catch(ex) { console.error('outdent failed:', ex); }
     }
 
     function handleDrop(e, node) {
       e.preventDefault();
       setDragOverId(null);
+      if (gestureCommittedRef.current) return; // gesture takes priority over swap
       if (!dragIdRef.current || dragIdRef.current === node.id) return;
       const dragNode = currentItemsRef.current.find(n => n.id === dragIdRef.current);
       if (!dragNode) return;
@@ -1524,7 +1606,7 @@
         return (
           <div key={node.id} className={`panel-card${isSwapPending?' swap-pending':''}${isFocused?' focused':''}${dragOverId===node.id?' drag-over':''}`}
             onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
-            draggable onDragStart={e=>handleDragStart(e,node)} onDragEnd={handleDragEnd} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
+            draggable onDragStart={e=>handleDragStart(e,node)} onDrag={e=>handleDragMove(e,node)} onDragEnd={handleDragEnd} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
             <div className="card-top">
               {dot && <div className={`dot dot-${dot}`} title={dotTitle} />}
               <span className="card-name">{node.name}</span>
@@ -1549,7 +1631,7 @@
       return (
         <div key={node.id} className={`list-row${isSwapPending?' swap-pending':''}${dragOverId===node.id?' drag-over':''}`}
           onClick={() => handleNodeClick(node)} tabIndex={0} onFocus={() => setFocusedId(node.id)}
-          draggable onDragStart={e=>handleDragStart(e,node)} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
+          draggable onDragStart={e=>handleDragStart(e,node)} onDrag={e=>handleDragMove(e,node)} onDragEnd={handleDragEnd} onDragOver={e=>{e.preventDefault();setDragOverId(node.id);}} onDragLeave={()=>setDragOverId(null)} onDrop={e=>handleDrop(e,node)}>
           {dot && <div className={`dot dot-${dot}`} title={dotTitle} />}
           <span className="rank-badge">#{rank}</span>
           <span className="list-row-name">{node.name}</span>
@@ -1579,6 +1661,7 @@
         {editModal && <EditNodeModal node={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); onReload(area); }} />}
         {addModal && <AddNodeModal area={area} parentId={addParentId} level={addLevel} siblingCount={currentItems.length} userId={userId} onClose={() => setAddModal(false)} onSaved={() => { setAddModal(false); onReload(area); }} />}
         {sendToModal && <SendToModal node={sendToModal} contextNodes={contextNodes || []} onClose={() => setSendToModal(null)} onMoved={() => { setSendToModal(null); onReload('new_day'); onReload('context'); }} />}
+        {gestureHint && <div className="gesture-hint">{gestureHint === 'outdent' ? '← Release to outdent' : 'Release to indent →'}</div>}
         <div className="section-heading" style={{display:'flex',alignItems:'center',gap:10}}>
           {heading}
           <span style={{opacity:0.4,fontWeight:400,letterSpacing:0}}>{currentItems.length}/10</span>
