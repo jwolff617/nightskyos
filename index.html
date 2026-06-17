@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -2065,7 +2065,7 @@
         const data = await DB.createCollabInvite({ node_id: inviteNodeId, owner_id: userId, invitee_email: inviteLabel.trim() || null });
         const token = data && data.token;
         if (token) {
-          setInviteLink(`https://nightskyos.vercel.app?invite=${token}`);
+          setInviteLink(`https://nightds.vercel.app?invite=${token}`);
           setInviteMsg(null);
         } else {
           setInviteMsg({ type: 'success', text: 'Invite created.' });

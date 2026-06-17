@@ -1,4 +1,4 @@
----
+﻿---
 name: nightos-session-memory
 description: Night_OS full build state — features, decisions, architecture, file paths, deployed URL
 metadata:
@@ -8,7 +8,7 @@ metadata:
 # Night_OS — Session Memory
 
 **Also called:** nightskyos (interchangeable)
-**Deployed:** https://nightskyos.vercel.app
+**Deployed:** https://nightds.vercel.app
 **Repo:** https://github.com/jwolff617/nightskyos
 **Local file:** `C:\Users\sagep\Downloads\NightOS\index.html`
 **Dictionary:** `C:\Users\sagep\Downloads\NightOS\NightOS_Dictionary.md`
